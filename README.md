@@ -32,7 +32,7 @@ $ export PATH=$PATH:$GOPATH/bin
 ```
 * clone the PLUMgrid libnetwork plugin repo
 ```
-$ git clone https://github.com/msagheer/libnetwork-plugin.git $GOPATH/src/github.com/libnetwork-plugin/
+$ git clone https://github.com/plumgrid/libnetwork-plugin.git $GOPATH/src/github.com/libnetwork-plugin/
 ```
 * move to plugin directory and make binaries
 ```
