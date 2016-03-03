@@ -18,6 +18,6 @@ const (
 	vip      = "172.16.236.150"
 	username = "plumgrid"
 	password = "plumgrid"
-	tenant   = "admin"
+	domain   = "admin"
 	pgtag1   = "pgrid"
 )

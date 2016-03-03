@@ -58,7 +58,7 @@ func pgBridgeCreate(ID string) {
 
 	//== PUT call
 
-	url2 := "https://" + vip + "/0/connectivity/domain/" + tenant + "/ne/bri" + ID
+	url2 := "https://" + vip + "/0/connectivity/domain/" + domain + "/ne/bri" + ID
 	fmt.Println("URL:>", url2)
 
 	var jsonStr1 = []byte(`{
@@ -92,7 +92,7 @@ func pgBridgeCreate(ID string) {
 
 	//== PUT call
 
-	url3 := "https://" + vip + "/0/connectivity/domain/" + tenant + "/rule_group/cnf" + ID
+	url3 := "https://" + vip + "/0/connectivity/domain/" + domain + "/rule_group/cnf" + ID
 	fmt.Println("URL:>", url3)
 
 	var jsonStr3 = []byte(`{
@@ -159,7 +159,7 @@ func pgBridgeDestroy(ID string) {
 
 	//== Delete call
 
-	url2 := "https://" + vip + "/0/connectivity/domain/" + tenant + "/ne/bri" + ID
+	url2 := "https://" + vip + "/0/connectivity/domain/" + domain + "/ne/bri" + ID
 	fmt.Println("URL:>", url2)
 
 	req2, err := http.NewRequest("DELETE", url2, nil)
@@ -179,7 +179,7 @@ func pgBridgeDestroy(ID string) {
 
 	//== DELETE call
 
-	url3 := "https://" + vip + "/0/connectivity/domain/" + tenant + "/rule_group/cnf" + ID
+	url3 := "https://" + vip + "/0/connectivity/domain/" + domain + "/rule_group/cnf" + ID
 	fmt.Println("URL:>", url3)
 
 	req3, err := http.NewRequest("DELETE", url3, nil)
