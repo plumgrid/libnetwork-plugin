@@ -1,11 +1,11 @@
 # PLUMgrid libnetwork-plugin
-PLUMgrid libnetwork plugin is a Docker network plugin that provides networking between docker containers using PLUMgrid.
-
-## Features
-- TODO
+The PLUMgrid Libnetwork Plugin enables seamless way to connect Docker containers to PLUMgrid. It provides
+distributed and scalable fast networking, with built in HA capabilities and access to feature rich
+networking platform as well as advanced networking capabilities like tunneling, multi-host networking,
+DNS, security etc.
 
 ## Pre-Requisites
-- PLUMgrid Director
+- PLUMgrid ONS
 - golang1.4 >=
 - Install Docker v1.9+
 ```
