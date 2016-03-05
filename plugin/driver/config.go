@@ -19,4 +19,5 @@ const (
 	username         = "plumgrid"
 	password         = "plumgrid"
 	default_domain   = "admin"
+        scope            = "local"
 )

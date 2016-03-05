@@ -118,7 +118,7 @@ type getcapabilitiesResp struct {
 
 func (driver *driver) getCapabilities(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode(&getcapabilitiesResp{
-		"local",
+	       scope,
 	})
 	if err != nil {
 		Log.Fatal("get capability encode:", err)
