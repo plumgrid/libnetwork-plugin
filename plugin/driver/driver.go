@@ -138,7 +138,9 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Create network request %+v", &create)
 
-	pgBridgeCreate(create.NetworkID)
+        domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
+        if domainid == nil { domainid = default_domain}
+	pgBridgeCreate(create.NetworkID, domainid.(string))
 
 	emptyResponse(w)
 
@@ -154,7 +156,9 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Delete network request: %+v", &delete)
 
-	pgBridgeDestroy(delete.NetworkID)
+        domainid := FindDomainFromNetwork(delete.NetworkID)
+        if domainid == "" { domainid = default_domain}
+	pgBridgeDestroy(delete.NetworkID, domainid)
 
 	emptyResponse(w)
 	Log.Infof("Destroy network %s", delete.NetworkID)
@@ -227,6 +231,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	netID := j.NetworkID
 	endID := j.EndpointID
+        domainid := FindDomainFromNetwork(netID)
+        if domainid == "" { domainid = default_domain}
 
 	// create and attach local name to the bridge
 	local := vethPair(endID[:5])
@@ -264,7 +270,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %+v\n", out1.String())
 
 	//second command {up the port on plumgrid}
-	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm vm_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + pgtag1
+	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm vm_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
 	Log.Infof("third cmd: %s", cmdStr2)
 	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
 	var out2 bytes.Buffer

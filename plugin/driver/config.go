@@ -15,9 +15,8 @@
 package driver
 
 const (
-	vip      = "172.16.236.150"
-	username = "plumgrid"
-	password = "plumgrid"
-	domain   = "admin"
-	pgtag1   = "pgrid"
+	vip              = "192.168.74.200"
+	username         = "plumgrid"
+	password         = "plumgrid"
+	default_domain   = "admin"
 )

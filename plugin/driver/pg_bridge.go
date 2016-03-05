@@ -19,13 +19,14 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
+        "encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 
 	Log "github.com/Sirupsen/logrus"
 )
 
-func pgBridgeCreate(ID string) {
+func pgBridgeCreate(ID string, domainid string) {
 	cookieJar, _ := cookiejar.New(nil)
 
 	tr := &http.Transport{
@@ -58,7 +59,7 @@ func pgBridgeCreate(ID string) {
 
 	//== PUT call
 
-	url2 := "https://" + vip + "/0/connectivity/domain/" + domain + "/ne/bri" + ID
+	url2 := "https://" + vip + "/0/connectivity/domain/" + domainid + "/ne/bri" + ID
 	fmt.Println("URL:>", url2)
 
 	var jsonStr1 = []byte(`{
@@ -92,7 +93,7 @@ func pgBridgeCreate(ID string) {
 
 	//== PUT call
 
-	url3 := "https://" + vip + "/0/connectivity/domain/" + domain + "/rule_group/cnf" + ID
+	url3 := "https://" + vip + "/0/connectivity/domain/" + domainid + "/rule_group/cnf" + ID
 	fmt.Println("URL:>", url3)
 
 	var jsonStr3 = []byte(`{
@@ -126,7 +127,7 @@ func pgBridgeCreate(ID string) {
 
 }
 
-func pgBridgeDestroy(ID string) {
+func pgBridgeDestroy(ID string, domainid string) {
 	cookieJar, _ := cookiejar.New(nil)
 
 	tr := &http.Transport{
@@ -159,7 +160,7 @@ func pgBridgeDestroy(ID string) {
 
 	//== Delete call
 
-	url2 := "https://" + vip + "/0/connectivity/domain/" + domain + "/ne/bri" + ID
+	url2 := "https://" + vip + "/0/connectivity/domain/" + domainid + "/ne/bri" + ID
 	fmt.Println("URL:>", url2)
 
 	req2, err := http.NewRequest("DELETE", url2, nil)
@@ -179,7 +180,7 @@ func pgBridgeDestroy(ID string) {
 
 	//== DELETE call
 
-	url3 := "https://" + vip + "/0/connectivity/domain/" + domain + "/rule_group/cnf" + ID
+	url3 := "https://" + vip + "/0/connectivity/domain/" + domainid + "/rule_group/cnf" + ID
 	fmt.Println("URL:>", url3)
 
 	req3, err := http.NewRequest("DELETE", url3, nil)
@@ -197,4 +198,67 @@ func pgBridgeDestroy(ID string) {
 	body3, _ := ioutil.ReadAll(resp3.Body)
 	fmt.Println("response Body:", string(body3))
 
+}
+
+
+func FindDomainFromNetwork(ID string) (domainid string) {
+        cookieJar, _ := cookiejar.New(nil)
+
+        tr := &http.Transport{
+                TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+        }
+        client := &http.Client{
+                Jar:       cookieJar,
+                Transport: tr,
+        }
+
+        url := "https://" + vip + "/0/login"
+        Log.Infof("URL:> %s", url)
+
+        var jsonStr = []byte(`{"userName":"` + username + `", "password":"` + password + `"}`)
+        req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+        req.Header.Set("Accept", "application/json")
+        req.Header.Set("Content-Type", "application/json")
+
+        resp, err := client.Do(req)
+        if err != nil {
+                fmt.Println(err)
+        }
+        defer resp.Body.Close()
+
+        fmt.Println("response Status:", resp.Status)
+        fmt.Println("response Headers:", resp.Header)
+        fmt.Println("response Cookies:", resp.Cookies())
+        body, _ := ioutil.ReadAll(resp.Body)
+        fmt.Println("response Body:", string(body))
+
+        url2 := "https://" + vip + "/0/connectivity/domain?configonly=true&level=3"
+        fmt.Println("URL:>", url2)
+
+        req2, err := http.NewRequest("GET", url2, nil)
+        req2.Header.Set("Accept", "application/json")
+
+        resp2, err2 := client.Do(req2)
+        if err2 != nil {
+                fmt.Println(err2)
+        }
+        defer resp2.Body.Close()
+        //fmt.Println("response Status:", resp2.Status)
+        //fmt.Println("response Headers:", resp2.Header)
+        body2, _ := ioutil.ReadAll(resp2.Body)
+        var domain_data map[string]interface{}
+        err3 := json.Unmarshal([]byte(body2), &domain_data)
+        if err3 != nil {
+            panic(err3)
+        }
+        for domains, domain_val := range  domain_data {
+            if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
+                if brne, ok := nes.(map[string]interface{})["bri"+ID]; ok {
+                    fmt.Println(brne)
+                    domainid = domains
+                    break
+                }
+             }
+        }
+        return
 }
