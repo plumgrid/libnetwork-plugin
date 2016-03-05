@@ -253,8 +253,7 @@ func FindDomainFromNetwork(ID string) (domainid string) {
         }
         for domains, domain_val := range  domain_data {
             if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
-                if brne, ok := nes.(map[string]interface{})["bri"+ID]; ok {
-                    fmt.Println(brne)
+                if _, ok := nes.(map[string]interface{})["bri"+ID]; ok {
                     domainid = domains
                     break
                 }
