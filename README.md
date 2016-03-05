@@ -44,9 +44,13 @@ $ make
 $ sudo mkdir -p /run/docker/plugins
 $ ./plugins/plumgrid
 ```
-* create a network with docker
+* create a network using PLUMgrid driver
 ```
 $ docker network create --subnet=10.0.0.0/24 -d plumgrid net1
+```
+* create a network on specific domain
+```
+$ docker network create --subnet=10.0.0.0/24 -d plumgrid -o domain=domainID net1
 ```
 * create a docker container onto that network
 ```
