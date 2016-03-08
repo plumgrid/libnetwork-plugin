@@ -26,7 +26,7 @@ import (
 	Log "github.com/Sirupsen/logrus"
 )
 
-func pgBridgeCreate(ID string, domainid string) {
+func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 	cookieJar, _ := cookiejar.New(nil)
 
 	tr := &http.Transport{
@@ -125,6 +125,28 @@ func pgBridgeCreate(ID string, domainid string) {
 	body3, _ := ioutil.ReadAll(resp3.Body)
 	fmt.Println("response Body:", string(body3))
 
+        //== PUT domain prop
+
+        url4 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/bri" + ID
+        fmt.Println("URL:>", url4)
+
+        var jsonStr4 = []byte(`{"ne_metadata": "`+gatewayip+`"
+        }`)
+
+        req4, err := http.NewRequest("PUT", url4, bytes.NewBuffer(jsonStr4))
+        req4.Header.Set("Accept", "application/json")
+        req4.Header.Set("Content-Type", "application/json")
+
+        resp4, err4 := client.Do(req4)
+        if err4 != nil {
+                fmt.Println(err4)
+        }
+        defer resp4.Body.Close()
+
+        fmt.Println("response Status:", resp4.Status)
+        body4, _ := ioutil.ReadAll(resp4.Body)
+        fmt.Println("response Body:", string(body4))
+
 }
 
 func pgBridgeDestroy(ID string, domainid string) {
@@ -157,6 +179,25 @@ func pgBridgeDestroy(ID string, domainid string) {
 	fmt.Println("response Cookies:", resp.Cookies())
 	body, _ := ioutil.ReadAll(resp.Body)
 	fmt.Println("response Body:", string(body))
+
+        //== Delete domain prop
+
+        url1 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/bri" + ID
+        fmt.Println("URL:>", url1)
+
+        req1, err := http.NewRequest("DELETE", url1, nil)
+        req1.Header.Set("Accept", "application/json")
+        req1.Header.Set("Content-Type", "application/json")
+
+        resp1, err1 := client.Do(req1)
+        if err1 != nil {
+                fmt.Println(err1)
+        }
+        defer resp1.Body.Close()
+
+        fmt.Println("response Status:", resp1.Status)
+        body1, _ := ioutil.ReadAll(resp1.Body)
+        fmt.Println("response Body:", string(body1))
 
 	//== Delete call
 
@@ -243,8 +284,6 @@ func FindDomainFromNetwork(ID string) (domainid string) {
                 fmt.Println(err2)
         }
         defer resp2.Body.Close()
-        //fmt.Println("response Status:", resp2.Status)
-        //fmt.Println("response Headers:", resp2.Header)
         body2, _ := ioutil.ReadAll(resp2.Body)
         var domain_data map[string]interface{}
         err3 := json.Unmarshal([]byte(body2), &domain_data)
@@ -259,5 +298,57 @@ func FindDomainFromNetwork(ID string) (domainid string) {
                 }
              }
         }
+        return
+}
+
+func FindNetworkGateway(domainID string, networkID string) (gatewayIP string) {
+        cookieJar, _ := cookiejar.New(nil)
+
+        tr := &http.Transport{
+                TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+        }
+        client := &http.Client{
+                Jar:       cookieJar,
+                Transport: tr,
+        }
+
+        url := "https://" + vip + "/0/login"
+        Log.Infof("URL:> %s", url)
+
+        var jsonStr = []byte(`{"userName":"` + username + `", "password":"` + password + `"}`)
+        req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+        req.Header.Set("Accept", "application/json")
+        req.Header.Set("Content-Type", "application/json")
+
+        resp, err := client.Do(req)
+        if err != nil {
+                fmt.Println(err)
+        }
+        defer resp.Body.Close()
+
+        fmt.Println("response Status:", resp.Status)
+        fmt.Println("response Headers:", resp.Header)
+        fmt.Println("response Cookies:", resp.Cookies())
+        body, _ := ioutil.ReadAll(resp.Body)
+        fmt.Println("response Body:", string(body))
+
+        url2 := "https://" + vip + "/0/connectivity/domain_prop/" + domainID + "/ne/bri" + networkID
+        fmt.Println("URL:>", url2)
+
+        req2, err := http.NewRequest("GET", url2, nil)
+        req2.Header.Set("Accept", "application/json")
+
+        resp2, err2 := client.Do(req2)
+        if err2 != nil {
+                fmt.Println(err2)
+        }
+        defer resp2.Body.Close()
+        body2, _ := ioutil.ReadAll(resp2.Body)
+        var domain_prop map[string]interface{}
+        err3 := json.Unmarshal([]byte(body2), &domain_prop)
+        if err3 != nil {
+            panic(err3)
+        }
+        gatewayIP = domain_prop["ne_metadata"].(string)
         return
 }

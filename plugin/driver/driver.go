@@ -25,7 +25,6 @@ import (
 
 	Log "github.com/Sirupsen/logrus"
 	docker "github.com/fsouza/go-dockerclient"
-
 	"github.com/docker/libnetwork/drivers/remote/api"
 
 	"github.com/gorilla/mux"
@@ -138,9 +137,10 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Create network request %+v", &create)
 
+        gatewayip := create.IPv4Data[0].Gateway.IP.String()
         domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
         if domainid == nil { domainid = default_domain}
-	pgBridgeCreate(create.NetworkID, domainid.(string))
+	pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
 	emptyResponse(w)
 
@@ -233,7 +233,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	endID := j.EndpointID
         domainid := FindDomainFromNetwork(netID)
         if domainid == "" { domainid = default_domain}
-
+        gatewayIP := FindNetworkGateway(domainid, netID)
 	// create and attach local name to the bridge
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
@@ -293,17 +293,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	res := &api.JoinResponse{
 		InterfaceName: ifname,
+                Gateway: gatewayIP,
 	}
-
-	/*if driver.nameserver != "" {
-		routeToDNS := &api.StaticRoute{
-			Destination: driver.nameserver + "/32",
-			RouteType:   types.CONNECTED,
-			NextHop:     "",
-			InterfaceID: 0,
-		}
-		res.StaticRoutes = []Rpi.StaticRoute{routeToDNS}
-	}*/
 
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
