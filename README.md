@@ -39,6 +39,8 @@ $ git clone https://github.com/plumgrid/libnetwork-plugin.git $GOPATH/src/github
 $ cd $GOPATH/src/github.com/libnetwork-plugin/
 $ make
 ```
+* move config.ini under /opt/pg/libnetwork/
+
 * now run the PLUMgrid libnetwork plugin
 ```
 $ sudo mkdir -p /run/docker/plugins

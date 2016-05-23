@@ -14,10 +14,32 @@
 
 package driver
 
+import (
+	"github.com/alyu/configparser"
+	"log"
+)
+
+var vip string
+
+// Read configuration file
+func ReadConfig() {
+	config, err := configparser.Read("/opt/pg/libnetwork/config.ini")
+	if err != nil {
+		log.Fatal(err)
+	}
+	// get a PLUMgrid virtual IP
+	section, err := config.Section("PLUMgrid")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		vip = section.ValueOf("virtual_ip")
+	}
+
+}
+
 const (
-	vip              = "192.168.74.200"
-	username         = "plumgrid"
-	password         = "plumgrid"
-	default_domain   = "admin"
-        scope            = "local"
+	username       = "plumgrid"
+	password       = "plumgrid"
+	default_domain = "admin"
+	scope          = "local"
 )
