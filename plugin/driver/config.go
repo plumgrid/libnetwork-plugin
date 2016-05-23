@@ -23,7 +23,7 @@ var vip string
 
 // Read configuration file
 func ReadConfig() {
-	config, err := configparser.Read("/etc/config.ini")
+	config, err := configparser.Read("/opt/pg/libnetwork/config.ini")
 	if err != nil {
 		log.Fatal(err)
 	}
