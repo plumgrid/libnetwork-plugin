@@ -46,6 +46,8 @@ func main() {
 		os.Exit(0)
 	}
 
+	driver.ReadConfig()
+
 	var d driver.Driver
 	d, err := driver.New(version)
 	if err != nil {
