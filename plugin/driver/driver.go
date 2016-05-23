@@ -270,7 +270,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %+v\n", out1.String())
 
 	//second command {up the port on plumgrid}
-	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm vm_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
+        cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm cont_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
 	Log.Infof("third cmd: %s", cmdStr2)
 	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
 	var out2 bytes.Buffer
@@ -325,7 +325,7 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %s\n", mac)
 
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm vm_" + l.EndpointID[:5] + " " + mac[:17]
+        cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
 	Log.Infof("second cmd: %s", cmdStr1)
 	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
 	var out1 bytes.Buffer

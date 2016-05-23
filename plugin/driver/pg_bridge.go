@@ -71,7 +71,7 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 				"ifc": {},
 				"mobility": "true",
 				"ne_description": "PLUMgrid Bridge",
-				"ne_dname": "bridge-` + ID[:10] + `",
+				"ne_dname": "net-` + ID[:10] + `",
 				"ne_group": "Bridge",
 				"ne_type": "bridge"
 	}`)
@@ -99,7 +99,7 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 	var jsonStr3 = []byte(`{
 					"mark_disabled": false,
 					"ne_dest": "/ne/bri` + ID + `/action/action1",
-					"ne_dname": "cnf-vmgroup-` + ID[10:] + `",
+					"ne_dname": "cont-` + ID[10:] + `",
 					"ne_type": "cnf-vmgroup",
 					"rule": {
 						"rules` + ID + `": {
@@ -127,7 +127,7 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 
         //== PUT domain prop
 
-        url4 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/bri" + ID
+        url4 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
         fmt.Println("URL:>", url4)
 
         var jsonStr4 = []byte(`{"ne_metadata": "`+gatewayip+`"
@@ -182,7 +182,7 @@ func pgBridgeDestroy(ID string, domainid string) {
 
         //== Delete domain prop
 
-        url1 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/bri" + ID
+        url1 := "https://" + vip + "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
         fmt.Println("URL:>", url1)
 
         req1, err := http.NewRequest("DELETE", url1, nil)
@@ -332,7 +332,7 @@ func FindNetworkGateway(domainID string, networkID string) (gatewayIP string) {
         body, _ := ioutil.ReadAll(resp.Body)
         fmt.Println("response Body:", string(body))
 
-        url2 := "https://" + vip + "/0/connectivity/domain_prop/" + domainID + "/ne/bri" + networkID
+        url2 := "https://" + vip + "/0/connectivity/domain_prop/" + domainID + "/ne/brii" + networkID
         fmt.Println("URL:>", url2)
 
         req2, err := http.NewRequest("GET", url2, nil)
