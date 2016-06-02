@@ -24,8 +24,8 @@ import (
 	"os/exec"
 
 	Log "github.com/Sirupsen/logrus"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/docker/libnetwork/drivers/remote/api"
+	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/gorilla/mux"
 	"github.com/vishvananda/netlink"
@@ -117,7 +117,7 @@ type getcapabilitiesResp struct {
 
 func (driver *driver) getCapabilities(w http.ResponseWriter, r *http.Request) {
 	err := json.NewEncoder(w).Encode(&getcapabilitiesResp{
-	       scope,
+		scope,
 	})
 	if err != nil {
 		Log.Fatal("get capability encode:", err)
@@ -137,9 +137,13 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Create network request %+v", &create)
 
-        gatewayip := create.IPv4Data[0].Gateway.IP.String()
-        domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
-        if domainid == nil { domainid = default_domain}
+	gatewayip := create.IPv4Data[0].Gateway.IP.String()
+	domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
+	if domainid == nil {
+		domainid = default_domain
+	}
+
+	pgVDCreate(domainid.(string))
 	pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
 	emptyResponse(w)
@@ -156,9 +160,12 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Delete network request: %+v", &delete)
 
-        domainid := FindDomainFromNetwork(delete.NetworkID)
-        if domainid == "" { domainid = default_domain}
+	domainid := FindDomainFromNetwork(delete.NetworkID)
+	if domainid == "" {
+		domainid = default_domain
+	}
 	pgBridgeDestroy(delete.NetworkID, domainid)
+	pgVDDelete(domainid)
 
 	emptyResponse(w)
 	Log.Infof("Destroy network %s", delete.NetworkID)
@@ -231,9 +238,11 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	netID := j.NetworkID
 	endID := j.EndpointID
-        domainid := FindDomainFromNetwork(netID)
-        if domainid == "" { domainid = default_domain}
-        gatewayIP := FindNetworkGateway(domainid, netID)
+	domainid := FindDomainFromNetwork(netID)
+	if domainid == "" {
+		domainid = default_domain
+	}
+	gatewayIP := FindNetworkGateway(domainid, netID)
 	// create and attach local name to the bridge
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
@@ -270,7 +279,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %+v\n", out1.String())
 
 	//second command {up the port on plumgrid}
-        cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm cont_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
+	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_vm cont_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
 	Log.Infof("third cmd: %s", cmdStr2)
 	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
 	var out2 bytes.Buffer
@@ -293,7 +302,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	res := &api.JoinResponse{
 		InterfaceName: ifname,
-                Gateway: gatewayIP,
+		Gateway:       gatewayIP,
 	}
 
 	objectResponse(w, res)
@@ -325,7 +334,7 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %s\n", mac)
 
 	//first command {adding port on plumgrid}
-        cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
+	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
 	Log.Infof("second cmd: %s", cmdStr1)
 	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
 	var out1 bytes.Buffer
