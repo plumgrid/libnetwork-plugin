@@ -87,7 +87,6 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 	defer resp2.Body.Close()
 
 	fmt.Println("response Status:", resp2.Status)
-	//fmt.Println("response Headers:", resp2.Header)
 	body2, _ := ioutil.ReadAll(resp2.Body)
 	fmt.Println("response Body:", string(body2))
 
@@ -121,7 +120,6 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 	defer resp3.Body.Close()
 
 	fmt.Println("response Status:", resp3.Status)
-	//fmt.Println("response Headers:", resp3.Header)
 	body3, _ := ioutil.ReadAll(resp3.Body)
 	fmt.Println("response Body:", string(body3))
 
@@ -215,7 +213,6 @@ func pgBridgeDestroy(ID string, domainid string) {
 	defer resp2.Body.Close()
 
 	fmt.Println("response Status:", resp2.Status)
-	//fmt.Println("response Headers:", resp2.Header)
 	body2, _ := ioutil.ReadAll(resp2.Body)
 	fmt.Println("response Body:", string(body2))
 
@@ -235,7 +232,6 @@ func pgBridgeDestroy(ID string, domainid string) {
 	defer resp3.Body.Close()
 
 	fmt.Println("response Status:", resp3.Status)
-	//fmt.Println("response Headers:", resp3.Header)
 	body3, _ := ioutil.ReadAll(resp3.Body)
 	fmt.Println("response Body:", string(body3))
 
@@ -430,7 +426,6 @@ func pgVDCreate(domainID string) {
 	defer resp2.Body.Close()
 
 	fmt.Println("response Status:", resp2.Status)
-	//fmt.Println("response Headers:", resp2.Header)
 	body2, _ := ioutil.ReadAll(resp2.Body)
 	fmt.Println("response Body:", string(body2))
 
@@ -453,7 +448,6 @@ func pgVDCreate(domainID string) {
 	defer resp3.Body.Close()
 
 	fmt.Println("response Status:", resp3.Status)
-	//fmt.Println("response Headers:", resp3.Header)
 	body3, _ := ioutil.ReadAll(resp3.Body)
 	fmt.Println("response Body:", string(body3))
 
@@ -576,68 +570,28 @@ func pgVDDelete(domainID string) {
 		if domains == domainID {
 			res := domain_val.(map[string]interface{})["ne"]
 			if len(res.(map[string]interface{})) == 0 {
-				fmt.Println("-----------deleted--------------")
+				fmt.Println("Deleting VD")
 
-				// PLUMgrid Tenant Manager Configuration
+				// Delete PEM Master Rules
 
-				url2 := "https://" + vip + "/0/tenant_manager/tenants" + "/" + domainID
-				Log.Infof("URL:>", url2)
+				url6 := "https://" + vip + "/0/pem_master/log_rule/" + domainID
+				fmt.Println("URL:>", url6)
 
-				req2, _ := http.NewRequest("DELETE", url2, nil)
-				req2.Header.Set("Accept", "application/json")
-				req2.Header.Set("Content-Type", "application/json")
+				req6, _ := http.NewRequest("DELETE", url6, nil)
+				req6.Header.Set("Accept", "application/json")
+				req6.Header.Set("Content-Type", "application/json")
 
-				resp2, err2 := client.Do(req2)
-				if err2 != nil {
-					fmt.Println(err2)
+				resp6, err6 := client.Do(req6)
+				if err6 != nil {
+					fmt.Println(err6)
 				}
-				defer resp2.Body.Close()
+				defer resp6.Body.Close()
 
-				fmt.Println("response Status:", resp2.Status)
-				//fmt.Println("response Headers:", resp2.Header)
-				body2, _ := ioutil.ReadAll(resp2.Body)
-				fmt.Println("response Body:", string(body2))
+				fmt.Println("response Status:", resp6.Status)
+				body6, _ := ioutil.ReadAll(resp6.Body)
+				fmt.Println("response Body:", string(body6))
 
-				// PLUMgrid Tunnel Configuration
-
-				url3 := "https://" + vip + "/0/tunnel_service/vnd_config/" + domainID
-				fmt.Println("URL:>", url3)
-
-				req3, _ := http.NewRequest("DELETE", url3, nil)
-				req3.Header.Set("Accept", "application/json")
-				req3.Header.Set("Content-Type", "application/json")
-
-				resp3, err3 := client.Do(req3)
-				if err3 != nil {
-					fmt.Println(err3)
-				}
-				defer resp3.Body.Close()
-
-				fmt.Println("response Status:", resp3.Status)
-				//fmt.Println("response Headers:", resp3.Header)
-				body3, _ := ioutil.ReadAll(resp3.Body)
-				fmt.Println("response Body:", string(body3))
-
-				// Create VD in Connectivity Manager
-
-				url4 := "https://" + vip + "/0/connectivity/domain/" + domainID
-				fmt.Println("URL:>", url4)
-
-				req4, _ := http.NewRequest("DELETE", url4, nil)
-				req4.Header.Set("Accept", "application/json")
-				req4.Header.Set("Content-Type", "application/json")
-
-				resp4, err4 := client.Do(req4)
-				if err4 != nil {
-					fmt.Println(err4)
-				}
-				defer resp4.Body.Close()
-
-				fmt.Println("response Status:", resp4.Status)
-				body4, _ := ioutil.ReadAll(resp4.Body)
-				fmt.Println("response Body:", string(body4))
-
-				// Create VD in Domain Prop
+				// Delete VD from Domain Prop
 
 				url5 := "https://" + vip + "/0/connectivity/domain_prop/" + domainID
 				fmt.Println("URL:>", url5)
@@ -656,24 +610,63 @@ func pgVDDelete(domainID string) {
 				body5, _ := ioutil.ReadAll(resp5.Body)
 				fmt.Println("response Body:", string(body5))
 
-				// Create PEM Master Rules
+				// Delete VD from Connectivity Manager
 
-				url6 := "https://" + vip + "/0/pem_master/log_rule/" + domainID
-				fmt.Println("URL:>", url6)
+				url4 := "https://" + vip + "/0/connectivity/domain/" + domainID
+				fmt.Println("URL:>", url4)
 
-				req6, _ := http.NewRequest("DELETE", url6, nil)
-				req6.Header.Set("Accept", "application/json")
-				req6.Header.Set("Content-Type", "application/json")
+				req4, _ := http.NewRequest("DELETE", url4, nil)
+				req4.Header.Set("Accept", "application/json")
+				req4.Header.Set("Content-Type", "application/json")
 
-				resp6, err6 := client.Do(req6)
-				if err6 != nil {
-					fmt.Println(err6)
+				resp4, err4 := client.Do(req4)
+				if err4 != nil {
+					fmt.Println(err4)
 				}
-				defer resp6.Body.Close()
+				defer resp4.Body.Close()
 
-				fmt.Println("response Status:", resp6.Status)
-				body6, _ := ioutil.ReadAll(resp6.Body)
-				fmt.Println("response Body:", string(body6))
+				fmt.Println("response Status:", resp4.Status)
+				body4, _ := ioutil.ReadAll(resp4.Body)
+				fmt.Println("response Body:", string(body4))
+
+				// Delete PLUMgrid Tunnel Configuration
+
+				url3 := "https://" + vip + "/0/tunnel_service/vnd_config/" + domainID
+				fmt.Println("URL:>", url3)
+
+				req3, _ := http.NewRequest("DELETE", url3, nil)
+				req3.Header.Set("Accept", "application/json")
+				req3.Header.Set("Content-Type", "application/json")
+
+				resp3, err3 := client.Do(req3)
+				if err3 != nil {
+					fmt.Println(err3)
+				}
+				defer resp3.Body.Close()
+
+				fmt.Println("response Status:", resp3.Status)
+				body3, _ := ioutil.ReadAll(resp3.Body)
+				fmt.Println("response Body:", string(body3))
+
+				// Delete PLUMgrid Tenant Manager Configuration
+
+				url2 := "https://" + vip + "/0/tenant_manager/tenants" + "/" + domainID
+				Log.Infof("URL:>", url2)
+
+				req2, _ := http.NewRequest("DELETE", url2, nil)
+				req2.Header.Set("Accept", "application/json")
+				req2.Header.Set("Content-Type", "application/json")
+
+				resp2, err2 := client.Do(req2)
+				if err2 != nil {
+					fmt.Println(err2)
+				}
+				defer resp2.Body.Close()
+
+				fmt.Println("response Status:", resp2.Status)
+				body2, _ := ioutil.ReadAll(resp2.Body)
+				fmt.Println("response Body:", string(body2))
+
 			}
 		}
 	}
