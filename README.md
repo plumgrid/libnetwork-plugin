@@ -41,11 +41,15 @@ $ make
 ```
 * move config.ini under /opt/pg/libnetwork/
 
+* update this /opt/pg/libnetwork/config.ini to contain the PLUMgrid Virtual IP
+
 * now run the PLUMgrid libnetwork plugin
 ```
 $ sudo mkdir -p /run/docker/plugins
-$ ./plugins/plumgrid
+$ ./plugin/plumgrid
 ```
+* the plugin run above will take up the current terminal session, open a new one for the commands given below
+
 * create a network using PLUMgrid driver
 ```
 $ docker network create --subnet=10.0.0.0/24 -d plumgrid net1
