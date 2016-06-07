@@ -19,7 +19,13 @@ import (
 	"log"
 )
 
-var vip string
+var (
+	vip            string
+	username       string
+	password       string
+	default_domain string
+	scope          string
+)
 
 // Read configuration file
 func ReadConfig() {
@@ -27,19 +33,23 @@ func ReadConfig() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// get a PLUMgrid virtual IP
-	section, err := config.Section("PLUMgrid")
-	if err != nil {
-		log.Fatal(err)
+
+	// get PLUMgrid config
+	pg_section, pg_err := config.Section("PLUMgrid")
+	if pg_err != nil {
+		log.Fatal(pg_err)
 	} else {
-		vip = section.ValueOf("virtual_ip")
+		vip = pg_section.ValueOf("virtual_ip")
+		username = pg_section.ValueOf("pg_username")
+		password = pg_section.ValueOf("pg_password")
+		default_domain = pg_section.ValueOf("pg_domain")
 	}
 
+	// get Libnetwork config
+	lib_section, lib_err := config.Section("Libnetwork")
+	if lib_err != nil {
+		log.Fatal(lib_err)
+	} else {
+		scope = lib_section.ValueOf("scope")
+	}
 }
-
-const (
-	username       = "plumgrid"
-	password       = "plumgrid"
-	default_domain = "admin"
-	scope          = "local"
-)
