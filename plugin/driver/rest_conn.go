@@ -17,7 +17,6 @@ package driver
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -27,7 +26,7 @@ import (
 
 func rest_Call(method string, uri string, data []byte) (body []byte) {
 
-	director_url := "https://" + vip
+	url := "https://" + vip
 
 	cookieJar, _ := cookiejar.New(nil)
 
@@ -39,7 +38,7 @@ func rest_Call(method string, uri string, data []byte) (body []byte) {
 		Transport: tr,
 	}
 
-	login_url := director_url + "/0/login"
+	login_url := url + "/0/login"
 
 	var cred_data = []byte(`{"userName":"` + username + `", "password":"` + password + `"}`)
 	req, err := http.NewRequest("POST", login_url, bytes.NewBuffer(cred_data))
@@ -48,34 +47,34 @@ func rest_Call(method string, uri string, data []byte) (body []byte) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		Log.Error(err)
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
-	fmt.Println("response Headers:", resp.Header)
-	fmt.Println("response Cookies:", resp.Cookies())
+	Log.Info("response Status:", resp.Status)
+	Log.Info("response Headers:", resp.Header)
+	Log.Info("response Cookies:", resp.Cookies())
 	resp_body, _ := ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(resp_body))
+	Log.Info("response Body:", string(resp_body))
 
 	// REST Call
 
-	url := director_url + uri
-	Log.Infof("URL:>", url)
+	rest_url := url + uri
+	Log.Info("URL:>", rest_url)
 
-	req, err = http.NewRequest(method, url, bytes.NewBuffer(data))
+	req, err = http.NewRequest(method, rest_url, bytes.NewBuffer(data))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err = client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		Log.Error(err)
 	}
 	defer resp.Body.Close()
 
-	fmt.Println("response Status:", resp.Status)
+	Log.Info("response Status:", resp.Status)
 	body, _ = ioutil.ReadAll(resp.Body)
-	fmt.Println("response Body:", string(body))
+	Log.Info("response Body:", string(body))
 
 	return
 }
