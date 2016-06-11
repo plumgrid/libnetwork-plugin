@@ -15,75 +15,48 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"net"
 	"os"
-	"os/signal"
-	"syscall"
 
-	Log "github.com/Sirupsen/logrus"
-	driver "github.com/plumgrid/libnetwork-plugin/plugin/driver"
+	log "github.com/Sirupsen/logrus"
+
+	"github.com/docker/go-plugins-helpers/network"
+	"github.com/plumgrid/libnetwork-plugin/plugin/driver"
+	"github.com/urfave/cli"
 )
 
-var version = "v1.0"
+const (
+	version = "1.0.0"
+)
 
 func main() {
-	var (
-		justVersion bool
-		address     string
-		//nameserver  string
-	)
 
-	flag.BoolVar(&justVersion, "version", false, "print version and exit")
-	flag.StringVar(&address, "socket", "/run/docker/plugins/plumgrid.sock", "socket on which to listen")
-	//flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
+	var flagDebug = cli.BoolFlag{
+		Name:  "debug, d",
+		Usage: "enable debugging",
+	}
+	app := cli.NewApp()
+	app.Name = "plumgrid"
+	app.Usage = "PLUMgrid Libnetwork Plugin"
+	app.Version = version
+	app.Flags = []cli.Flag{
+		flagDebug,
+	}
+	app.Action = Run
+	app.Run(os.Args)
+}
 
-	flag.Parse()
-
-	if justVersion {
-		fmt.Printf("PLUMgrid plugin %s\n", version)
-		os.Exit(0)
+// Run initializes the driver
+func Run(ctx *cli.Context) {
+	if ctx.Bool("debug") {
+		log.SetLevel(log.DebugLevel)
 	}
 
 	driver.ReadConfig()
 
-	var d driver.Driver
 	d, err := driver.New(version)
 	if err != nil {
-		Log.Fatalf("unable to create driver: %s", err)
+		panic(err)
 	}
-
-	/*if nameserver != "" {
-		if err := d.SetNameserver(nameserver); err != nil {
-			Log.Fatalf("could not set nameserver: %s", err)
-		}
-	}*/
-
-	var listener net.Listener
-
-	listener, err = net.Listen("unix", address)
-	if err != nil {
-		Log.Fatal(err)
-	}
-	defer listener.Close()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
-
-	endChan := make(chan error, 1)
-	go func() {
-		endChan <- d.Listen(listener)
-	}()
-
-	select {
-	case sig := <-sigChan:
-		Log.Debugf("Caught signal %s; shutting down", sig)
-	case err := <-endChan:
-		if err != nil {
-			Log.Errorf("Error from listener: ", err)
-			listener.Close()
-			os.Exit(1)
-		}
-	}
+	h := network.NewHandler(d)
+	h.ServeUnix("root", "plumgrid")
 }
