@@ -128,7 +128,7 @@ func (driver *Driver) DeleteEndpoint(delete *api.DeleteEndpointRequest) error {
 	return nil
 }
 
-// EndpointInfo returns informatoin about an endpoint
+// EndpointInfo returns information about an endpoint
 func (driver *Driver) EndpointInfo(info *api.InfoRequest) (*api.InfoResponse, error) {
 	Log.Infof("Endpoint info request: %+v", info)
 

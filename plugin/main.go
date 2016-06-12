@@ -17,8 +17,6 @@ package main
 import (
 	"os"
 
-	log "github.com/Sirupsen/logrus"
-
 	"github.com/docker/go-plugins-helpers/network"
 	"github.com/plumgrid/libnetwork-plugin/plugin/driver"
 	"github.com/urfave/cli"
@@ -30,27 +28,16 @@ const (
 
 func main() {
 
-	var flagDebug = cli.BoolFlag{
-		Name:  "debug, d",
-		Usage: "enable debugging",
-	}
 	app := cli.NewApp()
 	app.Name = "plumgrid"
 	app.Usage = "PLUMgrid Libnetwork Plugin"
 	app.Version = version
-	app.Flags = []cli.Flag{
-		flagDebug,
-	}
 	app.Action = Run
 	app.Run(os.Args)
 }
 
 // Run initializes the driver
-func Run(ctx *cli.Context) {
-	if ctx.Bool("debug") {
-		log.SetLevel(log.DebugLevel)
-	}
-
+func Run(*cli.Context) {
 	driver.ReadConfig()
 
 	d, err := driver.New(version)
