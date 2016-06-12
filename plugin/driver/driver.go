@@ -47,12 +47,14 @@ func New(version string) (*Driver, error) {
 // GetCapabilities tells libnetwork scope of driver
 func (driver *Driver) GetCapabilities() (*api.CapabilitiesResponse, error) {
 	scope := &api.CapabilitiesResponse{Scope: scope}
+
+	Log.Infof("Libnetwork Plugin scope is %+v", scope)
 	return scope, nil
 }
 
 // CreateNetwork creates a new network in PLUMgrid
 func (driver *Driver) CreateNetwork(create *api.CreateNetworkRequest) error {
-	Log.Infof("Create network request %+v", &create)
+	Log.Infof("Create network request %+v", create)
 
 	gatewayip, _, err := parseGatewayIP(create.IPv4Data[0].Gateway)
 	if err != nil {
@@ -64,29 +66,41 @@ func (driver *Driver) CreateNetwork(create *api.CreateNetworkRequest) error {
 		domainid = default_domain
 	}
 
-	pgVDCreate(domainid.(string))
-	pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip)
+	if err = pgVDCreate(domainid.(string)); err != nil {
+		return err
+	}
 
+	if err = pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip); err != nil {
+		return err
+	}
 	return nil
 }
 
 // DeleteNetwork deletes a network from PLUMgrid
 func (driver *Driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
-	Log.Infof("Delete network request: %+v", &delete)
+	Log.Infof("Delete network request: %+v", delete)
 
-	domainid := FindDomainFromNetwork(delete.NetworkID)
+	domainid, err := FindDomainFromNetwork(delete.NetworkID)
+	if err != nil {
+		return err
+	}
 	if domainid == "" {
 		domainid = default_domain
 	}
-	pgBridgeDestroy(delete.NetworkID, domainid)
-	pgVDDelete(domainid)
 
+	if err = pgBridgeDestroy(delete.NetworkID, domainid); err != nil {
+		return err
+	}
+
+	if err = pgVDDelete(domainid); err != nil {
+		return err
+	}
 	return nil
 }
 
 // CreateEndpoint creates a new Endpoint
 func (driver *Driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
-	Log.Infof("Create endpoint request %+v", &create)
+	Log.Infof("Create endpoint request %+v", create)
 
 	ip := create.Interface.Address
 	Log.Infof("Got IP from IPAM %s", ip)
@@ -95,6 +109,7 @@ func (driver *Driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 	if err_mac == nil {
 		ipnet_mac.IP = ip_mac
 	}
+
 	mac := makeMac(ipnet_mac.IP)
 
 	res := &api.CreateEndpointResponse{
@@ -103,41 +118,51 @@ func (driver *Driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.Cr
 		},
 	}
 
-	Log.Debugf("Create endpoint response: %+v", res)
-
+	Log.Info("Create endpoint response: %+v", res)
 	return res, nil
 }
 
 // DeleteEndpoint deletes an endpoint
 func (driver *Driver) DeleteEndpoint(delete *api.DeleteEndpointRequest) error {
-	Log.Debugf("Delete endpoint request: %+v", &delete)
+	Log.Infof("Delete endpoint request: %+v", delete)
 	return nil
 }
 
 // EndpointInfo returns informatoin about an endpoint
 func (driver *Driver) EndpointInfo(info *api.InfoRequest) (*api.InfoResponse, error) {
-	Log.Infof("Endpoint info request: %+v", &info)
+	Log.Infof("Endpoint info request: %+v", info)
+
 	res := &api.InfoResponse{
 		Value: make(map[string]string),
 	}
+
+	Log.Infof("Endpoint info response: %+v", res)
 	return res, nil
 }
 
 // Join call
 func (driver *Driver) Join(join *api.JoinRequest) (*api.JoinResponse, error) {
-	Log.Infof("Join request: %+v", &join)
+	Log.Infof("Join request: %+v", join)
 
 	netID := join.NetworkID
 	endID := join.EndpointID
 
-	domainid := FindDomainFromNetwork(netID)
+	domainid, err := FindDomainFromNetwork(netID)
+	if err != nil {
+		return nil, err
+	}
 	if domainid == "" {
 		domainid = default_domain
 	}
-	gatewayIP := FindNetworkGateway(domainid, netID)
+
+	gatewayIP, err_gw := FindNetworkGateway(domainid, netID)
+	if err_gw != nil {
+		return nil, err_gw
+	}
+
 	// create and attach local name to the bridge
 	local := vethPair(endID[:5])
-	if err := netlink.LinkAdd(local); err != nil {
+	if err = netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
 		return nil, err
 	}
@@ -195,12 +220,13 @@ func (driver *Driver) Join(join *api.JoinRequest) (*api.JoinResponse, error) {
 		Gateway:       gatewayIP,
 	}
 
+	Log.Infof("Join response: %+v", res)
 	return res, nil
 }
 
 // Leave call
 func (driver *Driver) Leave(leave *api.LeaveRequest) error {
-	Log.Infof("Leave request: %+v", &leave)
+	Log.Infof("Leave request: %+v", leave)
 
 	if_local_name := "tap" + leave.EndpointID[:5]
 
@@ -245,7 +271,6 @@ func (driver *Driver) Leave(leave *api.LeaveRequest) error {
 	if err := netlink.LinkDel(local); err != nil {
 		Log.Warningf("unable to delete veth on leave: %s", err)
 	}
-
 	return nil
 }
 

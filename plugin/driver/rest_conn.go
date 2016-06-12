@@ -17,6 +17,7 @@ package driver
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -24,7 +25,7 @@ import (
 	Log "github.com/Sirupsen/logrus"
 )
 
-func rest_Call(method string, uri string, data []byte) (body []byte) {
+func rest_Call(method string, uri string, data []byte) ([]byte, error) {
 
 	url := "https://" + vip
 
@@ -48,14 +49,18 @@ func rest_Call(method string, uri string, data []byte) (body []byte) {
 	resp, err := client.Do(req)
 	if err != nil {
 		Log.Error(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	Log.Info("response Status:", resp.Status)
-	Log.Info("response Headers:", resp.Header)
-	Log.Info("response Cookies:", resp.Cookies())
 	resp_body, _ := ioutil.ReadAll(resp.Body)
 	Log.Info("response Body:", string(resp_body))
+
+	if resp.Status != "200 OK" {
+		Log.Error(resp_body)
+		return nil, fmt.Errorf("PLUMgrid service not available.")
+	}
 
 	// REST Call
 
@@ -69,12 +74,18 @@ func rest_Call(method string, uri string, data []byte) (body []byte) {
 	resp, err = client.Do(req)
 	if err != nil {
 		Log.Error(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	Log.Info("response Status:", resp.Status)
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ := ioutil.ReadAll(resp.Body)
 	Log.Info("response Body:", string(body))
 
-	return
+	if resp.Status != "200 OK" {
+		Log.Error(body)
+		return nil, fmt.Errorf("PLUMgrid service not available.")
+	}
+
+	return body, nil
 }
