@@ -130,7 +130,7 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	gatewayip := create.IPv4Data[0].Gateway.IP.String()
 	domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
 	if domainid == nil {
-		domainid = default_domain
+		domainid = default_vd
 	}
 
 	DomainCreate(domainid.(string))
@@ -152,7 +152,7 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 
 	domainid := FindDomainFromNetwork(delete.NetworkID)
 	if domainid == "" {
-		domainid = default_domain
+		domainid = default_vd
 	}
 	BridgeDelete(delete.NetworkID, domainid)
 	DomainDelete(domainid)
@@ -230,7 +230,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	endID := j.EndpointID
 	domainid := FindDomainFromNetwork(netID)
 	if domainid == "" {
-		domainid = default_domain
+		domainid = default_vd
 	}
 	gatewayIP := FindNetworkGateway(domainid, netID)
 	// create and attach local name to the bridge

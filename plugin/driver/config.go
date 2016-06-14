@@ -23,7 +23,7 @@ var (
 	vip            string
 	username       string
 	password       string
-	default_domain string
+	default_vd     string
 	scope          string
 )
 
@@ -42,7 +42,7 @@ func ReadConfig() {
 		vip = pg_section.ValueOf("virtual_ip")
 		username = pg_section.ValueOf("pg_username")
 		password = pg_section.ValueOf("pg_password")
-		default_domain = pg_section.ValueOf("pg_domain")
+		default_vd = pg_section.ValueOf("default_domain")
 	}
 
 	// get Libnetwork config
