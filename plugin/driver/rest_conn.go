@@ -17,6 +17,7 @@ package driver
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -24,21 +25,19 @@ import (
 	Log "github.com/Sirupsen/logrus"
 )
 
-func rest_Call(method string, uri string, data []byte) (body []byte) {
+var cookieJar, _ = cookiejar.New(nil)
 
-	url := "https://" + vip
+var tr = &http.Transport{
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+}
 
-	cookieJar, _ := cookiejar.New(nil)
+var client = &http.Client{
+	Jar:       cookieJar,
+	Transport: tr,
+}
 
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Jar:       cookieJar,
-		Transport: tr,
-	}
-
-	login_url := url + "/0/login"
+func Login() error {
+	login_url := "https://" + vip + "/0/login"
 
 	var cred_data = []byte(`{"userName":"` + username + `", "password":"` + password + `"}`)
 	req, err := http.NewRequest("POST", login_url, bytes.NewBuffer(cred_data))
@@ -48,33 +47,64 @@ func rest_Call(method string, uri string, data []byte) (body []byte) {
 	resp, err := client.Do(req)
 	if err != nil {
 		Log.Error(err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	Log.Info("response Status:", resp.Status)
-	Log.Info("response Headers:", resp.Header)
-	Log.Info("response Cookies:", resp.Cookies())
 	resp_body, _ := ioutil.ReadAll(resp.Body)
 	Log.Info("response Body:", string(resp_body))
 
-	// REST Call
+	if resp.Status[:3] != "200" {
+		Log.Error(resp_body)
+		return fmt.Errorf("Unable to login into PLUMgrid.")
+	}
+	Log.Infof("Session established.")
+	return nil
+}
+
+func RestCall(method string, uri string, data []byte) ([]byte, error) {
+	body, err := RestHelper(method, uri, data)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
+func RestHelper(method string, uri string, data []byte) ([]byte, error) {
+	url := "https://" + vip
 
 	rest_url := url + uri
 	Log.Info("URL:>", rest_url)
 
-	req, err = http.NewRequest(method, rest_url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(method, rest_url, bytes.NewBuffer(data))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err = client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		Log.Error(err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	Log.Info("response Status:", resp.Status)
-	body, _ = ioutil.ReadAll(resp.Body)
-	Log.Info("response Body:", string(body))
+	body, _ := ioutil.ReadAll(resp.Body)
 
-	return
+	if resp.Status[:3] == "403" {
+		Log.Infof("Establishing a session...")
+		if login_err := Login(); login_err != nil {
+			return nil, login_err
+		}
+		return RestCall(method, uri, data)
+	}
+
+	if resp.Status[:3] != "200" {
+		Log.Error(body)
+		return nil, fmt.Errorf("PLUMgrid service not available.")
+	}
+
+	return body, nil
 }
