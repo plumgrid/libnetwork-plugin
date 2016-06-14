@@ -133,7 +133,7 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		domainid = default_domain
 	}
 
-	VDCreate(domainid.(string))
+	DomainCreate(domainid.(string))
 	BridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
 	emptyResponse(w)
@@ -154,8 +154,8 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	if domainid == "" {
 		domainid = default_domain
 	}
-	BridgeDestroy(delete.NetworkID, domainid)
-	VDDelete(domainid)
+	BridgeDelete(delete.NetworkID, domainid)
+	DomainDelete(domainid)
 
 	emptyResponse(w)
 	Log.Infof("Destroy network %s", delete.NetworkID)
