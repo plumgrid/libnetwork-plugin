@@ -16,172 +16,91 @@ package driver
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os/exec"
 
 	Log "github.com/Sirupsen/logrus"
-	"github.com/docker/libnetwork/drivers/remote/api"
+	api "github.com/docker/go-plugins-helpers/network"
 	docker "github.com/fsouza/go-dockerclient"
 
-	"github.com/gorilla/mux"
 	"github.com/vishvananda/netlink"
 )
 
-const (
-	MethodReceiver = "NetworkDriver"
-)
-
-type Driver interface {
-	//SetNameserver(string) error
-	Listen(net.Listener) error
-}
-
-type driver struct {
+type Driver struct {
 	client  *docker.Client
 	version string
-	//nameserver string
 }
 
-func New(version string) (Driver, error) {
+func New(version string) (*Driver, error) {
 	client, err := docker.NewClient("unix:///var/run/docker.sock")
 	if err != nil {
 		return nil, fmt.Errorf("could not connect to docker: %s", err)
 	}
 
-	return &driver{
+	return &Driver{
 		client:  client,
 		version: version,
 	}, nil
 }
 
-/*func (driver *driver) SetNameserver(nameserver string) error {
-	if net.ParseIP(nameserver) == nil {
-		return fmt.Errorf(`cannot parse IP address "%s"`, nameserver)
-	}
-	driver.nameserver = nameserver
-	return nil
-}*/
+// GetCapabilities tells libnetwork scope of driver
+func (driver *Driver) GetCapabilities() (*api.CapabilitiesResponse, error) {
+	scope := &api.CapabilitiesResponse{Scope: scope}
 
-func (driver *driver) Listen(socket net.Listener) error {
-	router := mux.NewRouter()
-	router.NotFoundHandler = http.HandlerFunc(notFound)
-
-	router.Methods("GET").Path("/status").HandlerFunc(driver.status)
-	router.Methods("POST").Path("/Plugin.Activate").HandlerFunc(driver.handshake)
-
-	handleMethod := func(method string, h http.HandlerFunc) {
-		router.Methods("POST").Path(fmt.Sprintf("/%s.%s", MethodReceiver, method)).HandlerFunc(h)
-	}
-
-	handleMethod("GetCapabilities", driver.getCapabilities)
-	handleMethod("CreateNetwork", driver.createNetwork)
-	handleMethod("DeleteNetwork", driver.deleteNetwork)
-	handleMethod("CreateEndpoint", driver.createEndpoint)
-	handleMethod("DeleteEndpoint", driver.deleteEndpoint)
-	handleMethod("EndpointOperInfo", driver.infoEndpoint)
-	handleMethod("Join", driver.joinEndpoint)
-	handleMethod("Leave", driver.leaveEndpoint)
-
-	return http.Serve(socket, router)
+	Log.Infof("Libnetwork Plugin scope is %+v", scope)
+	return scope, nil
 }
 
-// Handle Functions
+// CreateNetwork creates a new network in PLUMgrid
+func (driver *Driver) CreateNetwork(create *api.CreateNetworkRequest) error {
+	Log.Infof("Create network request %+v", create)
 
-type handshakeResp struct {
-	Implements []string
-}
-
-func (driver *driver) handshake(w http.ResponseWriter, r *http.Request) {
-	err := json.NewEncoder(w).Encode(&handshakeResp{
-		[]string{"NetworkDriver"},
-	})
+	gatewayip, _, err := parseGatewayIP(create.IPv4Data[0].Gateway)
 	if err != nil {
-		sendError(w, "encode error", http.StatusInternalServerError)
-		Log.Error("handshake encode:", err)
-		return
+		return err
 	}
-	Log.Infof("Handshake completed")
-}
 
-func (driver *driver) status(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, fmt.Sprintln("PLUMgrid Libnetwork-plugin", driver.version))
-}
-
-type getcapabilitiesResp struct {
-	Scope string
-}
-
-func (driver *driver) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	err := json.NewEncoder(w).Encode(&getcapabilitiesResp{
-		scope,
-	})
-	if err != nil {
-		Log.Fatal("get capability encode:", err)
-		sendError(w, "encode error", http.StatusInternalServerError)
-		return
-	}
-	Log.Infof("Get Capability completed")
-}
-
-// create network call
-func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
-	var create api.CreateNetworkRequest
-	err := json.NewDecoder(r.Body).Decode(&create)
-	if err != nil {
-		sendError(w, "Unable to decode JSON payload: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	Log.Infof("Create network request %+v", &create)
-
-	gatewayip := create.IPv4Data[0].Gateway.IP.String()
 	domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
 	if domainid == nil {
 		domainid = default_domain
 	}
 
-	pgVDCreate(domainid.(string))
-	pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip)
+	if err = pgVDCreate(domainid.(string)); err != nil {
+		return err
+	}
 
-	emptyResponse(w)
-
-	Log.Infof("Create network %s", create.NetworkID)
+	if err = pgBridgeCreate(create.NetworkID, domainid.(string), gatewayip); err != nil {
+		return err
+	}
+	return nil
 }
 
-// delete network call
-func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
-	var delete api.DeleteNetworkRequest
-	if err := json.NewDecoder(r.Body).Decode(&delete); err != nil {
-		sendError(w, "Unable to decode JSON payload: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	Log.Infof("Delete network request: %+v", &delete)
+// DeleteNetwork deletes a network from PLUMgrid
+func (driver *Driver) DeleteNetwork(delete *api.DeleteNetworkRequest) error {
+	Log.Infof("Delete network request: %+v", delete)
 
-	domainid := FindDomainFromNetwork(delete.NetworkID)
+	domainid, err := FindDomainFromNetwork(delete.NetworkID)
+	if err != nil {
+		return err
+	}
 	if domainid == "" {
 		domainid = default_domain
 	}
-	pgBridgeDestroy(delete.NetworkID, domainid)
-	pgVDDelete(domainid)
 
-	emptyResponse(w)
-	Log.Infof("Destroy network %s", delete.NetworkID)
+	if err = pgBridgeDestroy(delete.NetworkID, domainid); err != nil {
+		return err
+	}
+
+	if err = pgVDDelete(domainid); err != nil {
+		return err
+	}
+	return nil
 }
 
-// create endpoint call
-func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
-	var create api.CreateEndpointRequest
-	if err := json.NewDecoder(r.Body).Decode(&create); err != nil {
-		sendError(w, "Unable to decode JSON payload: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	Log.Infof("Create endpoint request %+v", &create)
+// CreateEndpoint creates a new Endpoint
+func (driver *Driver) CreateEndpoint(create *api.CreateEndpointRequest) (*api.CreateEndpointResponse, error) {
 	Log.Infof("Create endpoint request %+v", create)
-
-	endID := create.EndpointID
 
 	ip := create.Interface.Address
 	Log.Infof("Got IP from IPAM %s", ip)
@@ -190,65 +109,62 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err_mac == nil {
 		ipnet_mac.IP = ip_mac
 	}
+
 	mac := makeMac(ipnet_mac.IP)
 
-	respIface := &api.EndpointInterface{
-		MacAddress: mac,
-	}
-	resp := &api.CreateEndpointResponse{
-		Interface: respIface,
+	res := &api.CreateEndpointResponse{
+		Interface: &api.EndpointInterface{
+			MacAddress: mac,
+		},
 	}
 
-	objectResponse(w, resp)
-	Log.Infof("Create endpoint %s %+v", endID, resp)
+	Log.Info("Create endpoint response: %+v", res)
+	return res, nil
 }
 
-// delete endpoint call
-func (driver *driver) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
-	var delete api.DeleteEndpointRequest
-	if err := json.NewDecoder(r.Body).Decode(&delete); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
-		return
-	}
-	Log.Debugf("Delete endpoint request: %+v", &delete)
-	emptyResponse(w)
-	Log.Infof("Delete endpoint %s", delete.EndpointID)
+// DeleteEndpoint deletes an endpoint
+func (driver *Driver) DeleteEndpoint(delete *api.DeleteEndpointRequest) error {
+	Log.Infof("Delete endpoint request: %+v", delete)
+	return nil
 }
 
-// endpoint info request
-func (driver *driver) infoEndpoint(w http.ResponseWriter, r *http.Request) {
-	var info api.EndpointInfoRequest
-	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
-		return
+// EndpointInfo returns information about an endpoint
+func (driver *Driver) EndpointInfo(info *api.InfoRequest) (*api.InfoResponse, error) {
+	Log.Infof("Endpoint info request: %+v", info)
+
+	res := &api.InfoResponse{
+		Value: make(map[string]string),
 	}
-	Log.Infof("Endpoint info request: %+v", &info)
-	objectResponse(w, &api.EndpointInfoResponse{Value: map[string]interface{}{}})
-	Log.Infof("Endpoint info %s", info.EndpointID)
+
+	Log.Infof("Endpoint info response: %+v", res)
+	return res, nil
 }
 
-// join call
-func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
-	var j api.JoinRequest
-	if err := json.NewDecoder(r.Body).Decode(&j); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
-		return
-	}
-	Log.Infof("Join request: %+v", &j)
+// Join call
+func (driver *Driver) Join(join *api.JoinRequest) (*api.JoinResponse, error) {
+	Log.Infof("Join request: %+v", join)
 
-	netID := j.NetworkID
-	endID := j.EndpointID
-	domainid := FindDomainFromNetwork(netID)
+	netID := join.NetworkID
+	endID := join.EndpointID
+
+	domainid, err := FindDomainFromNetwork(netID)
+	if err != nil {
+		return nil, err
+	}
 	if domainid == "" {
 		domainid = default_domain
 	}
-	gatewayIP := FindNetworkGateway(domainid, netID)
+
+	gatewayIP, err_gw := FindNetworkGateway(domainid, netID)
+	if err_gw != nil {
+		return nil, err_gw
+	}
+
 	// create and attach local name to the bridge
 	local := vethPair(endID[:5])
-	if err := netlink.LinkAdd(local); err != nil {
+	if err = netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
-		errorResponsef(w, "could not create veth pair")
-		return
+		return nil, err
 	}
 
 	if_local_name := "tap" + endID[:5]
@@ -291,8 +207,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %+v\n", out2.String())
 
 	if netlink.LinkSetUp(local) != nil {
-		errorResponsef(w, `unable to bring veth up`)
-		return
+		return nil, fmt.Errorf("Unable to bring veth up")
 	}
 
 	ifname := &api.InterfaceName{
@@ -301,24 +216,19 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := &api.JoinResponse{
-		InterfaceName: ifname,
+		InterfaceName: *ifname,
 		Gateway:       gatewayIP,
 	}
 
-	objectResponse(w, res)
-	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+	Log.Infof("Join response: %+v", res)
+	return res, nil
 }
 
-// leave call
-func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
-	var l api.LeaveRequest
-	if err := json.NewDecoder(r.Body).Decode(&l); err != nil {
-		sendError(w, "Could not decode JSON encode payload", http.StatusBadRequest)
-		return
-	}
-	Log.Infof("Leave request: %+v", &l)
+// Leave call
+func (driver *Driver) Leave(leave *api.LeaveRequest) error {
+	Log.Infof("Leave request: %+v", leave)
 
-	if_local_name := "tap" + l.EndpointID[:5]
+	if_local_name := "tap" + leave.EndpointID[:5]
 
 	//getting mac address of tap...
 	cmdStr0 := "ifconfig " + if_local_name + " | awk '/HWaddr/ {print $NF}'"
@@ -334,7 +244,7 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %s\n", mac)
 
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
+	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + leave.EndpointID[:5] + " " + mac[:17]
 	Log.Infof("second cmd: %s", cmdStr1)
 	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
 	var out1 bytes.Buffer
@@ -357,10 +267,29 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("output of cmd: %+v\n", out2.String())
 
-	local := vethPair(l.EndpointID[:5])
+	local := vethPair(leave.EndpointID[:5])
 	if err := netlink.LinkDel(local); err != nil {
 		Log.Warningf("unable to delete veth on leave: %s", err)
 	}
-	emptyResponse(w)
-	Log.Infof("Leave %s:%s", l.NetworkID, l.EndpointID)
+	return nil
+}
+
+// DiscoverNew
+func (driver *Driver) DiscoverNew(n *api.DiscoveryNotification) error {
+	return nil
+}
+
+// DiscoverDelete
+func (driver *Driver) DiscoverDelete(d *api.DiscoveryNotification) error {
+	return nil
+}
+
+// ProgramExternalConnectivity
+func (driver *Driver) ProgramExternalConnectivity(r *api.ProgramExternalConnectivityRequest) error {
+	return nil
+}
+
+// RevokeExternalConnectivity
+func (driver *Driver) RevokeExternalConnectivity(r *api.RevokeExternalConnectivityRequest) error {
+	return nil
 }

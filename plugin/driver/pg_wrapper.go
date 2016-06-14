@@ -16,10 +16,11 @@ package driver
 
 import (
 	"encoding/json"
-	"fmt"
+
+	Log "github.com/Sirupsen/logrus"
 )
 
-func pgBridgeCreate(ID string, domainid string, gatewayip string) {
+func pgBridgeCreate(ID string, domainid string, gatewayip string) error {
 
 	// PUT Domain Data
 
@@ -37,7 +38,9 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 				"ne_type": "bridge"
 	}`)
 
-	rest_Call("PUT", url, data)
+	if _, err := rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// PUT Rule group Data
 
@@ -56,7 +59,9 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 					}
 	}`)
 
-	rest_Call("PUT", url, data)
+	if _, err := rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// PUT Domain prop
 
@@ -64,81 +69,102 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 
 	data = []byte(`{"ne_metadata": "` + gatewayip + `"}`)
 
-	rest_Call("PUT", url, data)
+	if _, err := rest_Call("PUT", url, data); err != nil {
+		return err
+	}
+	return nil
 }
 
-func pgBridgeDestroy(ID string, domainid string) {
+func pgBridgeDestroy(ID string, domainid string) error {
 
 	// Delete domain prop
 
 	url := "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
 
-	rest_Call("DELETE", url, nil)
+	if _, err := rest_Call("DELETE", url, nil); err != nil {
+		return err
+	}
 
 	// Delete Domain Data
 
 	url = "/0/connectivity/domain/" + domainid + "/ne/bri" + ID
 
-	rest_Call("DELETE", url, nil)
+	if _, err := rest_Call("DELETE", url, nil); err != nil {
+		return err
+	}
 
 	// DELETE Rule group Data
 
 	url = "/0/connectivity/domain/" + domainid + "/rule_group/cnf" + ID
 
-	rest_Call("DELETE", url, nil)
+	if _, err := rest_Call("DELETE", url, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
-func FindDomainFromNetwork(ID string) (domainid string) {
+func FindDomainFromNetwork(ID string) (string, error) {
 
 	url := "/0/connectivity/domain?configonly=true&level=3"
 
-	body := rest_Call("GET", url, nil)
+	body, err := rest_Call("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 
 	var domain_data map[string]interface{}
-	err := json.Unmarshal([]byte(body), &domain_data)
+	err = json.Unmarshal([]byte(body), &domain_data)
 	if err != nil {
-		panic(err)
+		Log.Error(err)
+		return "", err
 	}
 	for domains, domain_val := range domain_data {
 		if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
 			if _, ok := nes.(map[string]interface{})["bri"+ID]; ok {
-				domainid = domains
-				break
+				return domains, nil
 			}
 		}
 	}
-	return
+	return "", nil
 }
 
-func FindNetworkGateway(domainID string, networkID string) (gatewayIP string) {
+func FindNetworkGateway(domainID string, networkID string) (string, error) {
 
 	url := "/0/connectivity/domain_prop/" + domainID + "/ne/brii" + networkID
 
-	body := rest_Call("GET", url, nil)
+	body, err := rest_Call("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 
 	var domain_prop map[string]interface{}
-	err := json.Unmarshal([]byte(body), &domain_prop)
+	err = json.Unmarshal([]byte(body), &domain_prop)
 	if err != nil {
-		panic(err)
+		Log.Error(err)
+		return "", err
 	}
-	gatewayIP = domain_prop["ne_metadata"].(string)
-	return
+	gatewayIP := domain_prop["ne_metadata"].(string)
+	return gatewayIP, nil
 }
 
-func pgVDCreate(domainID string) {
+func pgVDCreate(domainID string) error {
 
 	url := "/0/connectivity/domain?configonly=true"
 
-	body := rest_Call("GET", url, nil)
+	body, err := rest_Call("GET", url, nil)
+	if err != nil {
+		return err
+	}
 
 	var domain_data map[string]interface{}
-	err := json.Unmarshal([]byte(body), &domain_data)
+	err = json.Unmarshal([]byte(body), &domain_data)
 	if err != nil {
-		panic(err)
+		Log.Error(err)
+		return err
 	}
 	for domains := range domain_data {
 		if domains == domainID {
-			return
+			return nil
 		}
 	}
 
@@ -155,7 +181,9 @@ func pgVDCreate(domainID string) {
 					"property": "Container ` + domainID + ` Property",
 					"domains": {}, "rules": {}}}}`)
 
-	rest_Call("PUT", url, data)
+	if _, err = rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// PLUMgrid Tunnel Configuration
 
@@ -164,7 +192,9 @@ func pgVDCreate(domainID string) {
 	data = []byte(`{"profile_name": "VXLAN",
 			"add_vlan": "False"}`)
 
-	rest_Call("PUT", url, data)
+	if _, err = rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// Create VD in Connectivity Manager
 
@@ -173,7 +203,9 @@ func pgVDCreate(domainID string) {
 	data = []byte(`{"container_group": "` + domainID + `",
 			"topology_name": "docker"}`)
 
-	rest_Call("PUT", url, data)
+	if _, err = rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// Create VD in Domain Prop
 
@@ -181,7 +213,9 @@ func pgVDCreate(domainID string) {
 
 	data = []byte(`{}`)
 
-	rest_Call("PUT", url, data)
+	if _, err = rest_Call("PUT", url, data); err != nil {
+		return err
+	}
 
 	// Create PEM Master Rules
 
@@ -192,56 +226,73 @@ func pgVDCreate(domainID string) {
 					"pgtag1": "` + domainID + `",
 					"log_ifc_type": "ACCESS_VM"}}}`)
 
-	rest_Call("PUT", url, data)
+	if _, err = rest_Call("PUT", url, data); err != nil {
+		return err
+	}
+	return nil
 }
 
-func pgVDDelete(domainID string) {
+func pgVDDelete(domainID string) error {
 
 	url := "/0/connectivity/domain?configonly=true"
 
-	body := rest_Call("GET", url, nil)
+	body, err := rest_Call("GET", url, nil)
+	if err != nil {
+		return err
+	}
 
 	var domain_data map[string]interface{}
-	err := json.Unmarshal([]byte(body), &domain_data)
+	err = json.Unmarshal([]byte(body), &domain_data)
 	if err != nil {
-		panic(err)
+		Log.Error(err)
+		return err
 	}
 	for domains, domain_val := range domain_data {
 		if domains == domainID {
 			res := domain_val.(map[string]interface{})["ne"]
 			if len(res.(map[string]interface{})) == 0 {
-				fmt.Println("Deleting VD")
 
 				// Delete PEM Master Rules
 
 				url = "/0/pem_master/log_rule/" + domainID
 
-				rest_Call("DELETE", url, nil)
+				if _, err = rest_Call("DELETE", url, nil); err != nil {
+					return err
+				}
 
 				// Delete VD from Domain Prop
 
 				url = "/0/connectivity/domain_prop/" + domainID
 
-				rest_Call("DELETE", url, nil)
+				if _, err = rest_Call("DELETE", url, nil); err != nil {
+					return err
+				}
 
 				// Delete VD from Connectivity Manager
 
 				url = "/0/connectivity/domain/" + domainID
 
-				rest_Call("DELETE", url, nil)
+				if _, err = rest_Call("DELETE", url, nil); err != nil {
+					return err
+				}
 
 				// Delete PLUMgrid Tunnel Configuration
 
 				url = "/0/tunnel_service/vnd_config/" + domainID
 
-				rest_Call("DELETE", url, nil)
+				if _, err = rest_Call("DELETE", url, nil); err != nil {
+					return err
+				}
 
 				// Delete PLUMgrid Tenant Manager Configuration
 
 				url = "/0/tenant_manager/tenants" + "/" + domainID
 
-				rest_Call("DELETE", url, nil)
+				if _, err = rest_Call("DELETE", url, nil); err != nil {
+					return err
+				}
 			}
 		}
 	}
+	return nil
 }
