@@ -36,14 +36,12 @@ const (
 )
 
 type Driver interface {
-	//SetNameserver(string) error
 	Listen(net.Listener) error
 }
 
 type driver struct {
 	client  *docker.Client
 	version string
-	//nameserver string
 }
 
 func New(version string) (Driver, error) {
@@ -57,14 +55,6 @@ func New(version string) (Driver, error) {
 		version: version,
 	}, nil
 }
-
-/*func (driver *driver) SetNameserver(nameserver string) error {
-	if net.ParseIP(nameserver) == nil {
-		return fmt.Errorf(`cannot parse IP address "%s"`, nameserver)
-	}
-	driver.nameserver = nameserver
-	return nil
-}*/
 
 func (driver *driver) Listen(socket net.Listener) error {
 	router := mux.NewRouter()
@@ -124,7 +114,7 @@ func (driver *driver) getCapabilities(w http.ResponseWriter, r *http.Request) {
 		sendError(w, "encode error", http.StatusInternalServerError)
 		return
 	}
-	Log.Infof("Get Capability completed")
+	Log.Infof("Get Capabilities completed")
 }
 
 // create network call
