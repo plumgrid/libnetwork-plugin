@@ -1,7 +1,7 @@
 # PLUMgrid libnetwork-plugin
 
 The PLUMgrid Libnetwork Plugin enables seamless way to connect Docker containers to PLUMgrid.
-It enable rich networking functions, secure multi-tenancy, multi-host networking,
+It enables rich networking functions, secure multi-tenancy, multi-host networking,
 high availability, distributed scale-out performance, and container-based micro-segmentation
 for Docker clouds.
 
