@@ -32,13 +32,10 @@ func main() {
 	var (
 		justVersion bool
 		address     string
-		//nameserver  string
 	)
 
 	flag.BoolVar(&justVersion, "version", false, "print version and exit")
 	flag.StringVar(&address, "socket", "/run/docker/plugins/plumgrid.sock", "socket on which to listen")
-	//flag.StringVar(&nameserver, "nameserver", "", "nameserver to provide to containers")
-
 	flag.Parse()
 
 	if justVersion {
@@ -51,14 +48,8 @@ func main() {
 	var d driver.Driver
 	d, err := driver.New(version)
 	if err != nil {
-		Log.Fatalf("unable to create driver: %s", err)
+		Log.Fatalf("Unable to create driver: %s", err)
 	}
-
-	/*if nameserver != "" {
-		if err := d.SetNameserver(nameserver); err != nil {
-			Log.Fatalf("could not set nameserver: %s", err)
-		}
-	}*/
 
 	var listener net.Listener
 
