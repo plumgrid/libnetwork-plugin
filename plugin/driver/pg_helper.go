@@ -19,7 +19,7 @@ import (
 	"fmt"
 )
 
-func pgBridgeCreate(ID string, domainid string, gatewayip string) {
+func BridgeCreate(ID string, domainid string, gatewayip string) {
 
 	url := "/0/connectivity/domain/" + domainid + "/ne/bri" + ID
 	data := []byte(`{"action": {
@@ -57,7 +57,7 @@ func pgBridgeCreate(ID string, domainid string, gatewayip string) {
 	RestCall("PUT", url, data)
 }
 
-func pgBridgeDestroy(ID string, domainid string) {
+func BridgeDestroy(ID string, domainid string) {
 
 	url := "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
 	RestCall("DELETE", url, nil)
@@ -102,7 +102,7 @@ func FindNetworkGateway(domainID string, networkID string) (gatewayIP string) {
 	return
 }
 
-func pgVDCreate(domainID string) {
+func VDCreate(domainID string) {
 
 	url := "/0/connectivity/domain?configonly=true"
 	body, _ := RestCall("GET", url, nil)
@@ -152,7 +152,7 @@ func pgVDCreate(domainID string) {
 	RestCall("PUT", url, data)
 }
 
-func pgVDDelete(domainID string) {
+func VDDelete(domainID string) {
 
 	url := "/0/connectivity/domain?configonly=true"
 	body, _ := RestCall("GET", url, nil)
