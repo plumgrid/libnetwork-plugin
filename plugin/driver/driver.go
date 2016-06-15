@@ -320,21 +320,8 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
-	//getting mac address of tap...
-	cmdStr0 := "ifconfig " + if_local_name + " | awk '/HWaddr/ {print $NF}'"
-	Log.Infof("mac address cmd: %s", cmdStr0)
-	cmd0 := exec.Command("/bin/sh", "-c", cmdStr0)
-	var out0 bytes.Buffer
-	cmd0.Stdout = &out0
-	err0 := cmd0.Run()
-	if err0 != nil {
-		Log.Error("Error thrown: ", err0)
-	}
-	mac := out0.String()
-	Log.Infof("output of cmd: %s\n", mac)
-
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
+	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
 	Log.Infof("second cmd: %s", cmdStr1)
 	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
 	var out1 bytes.Buffer
