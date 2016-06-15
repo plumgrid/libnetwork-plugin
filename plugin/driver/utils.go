@@ -17,7 +17,6 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 
 	Log "github.com/Sirupsen/logrus"
@@ -61,12 +60,4 @@ func vethPair(suffix string) *netlink.Veth {
 		LinkAttrs: netlink.LinkAttrs{Name: "tap" + suffix},
 		PeerName:  "ns" + suffix,
 	}
-}
-
-func makeMac(ip net.IP) string {
-	hw := make(net.HardwareAddr, 6)
-	hw[0] = 0x7a
-	hw[1] = 0x42
-	copy(hw[2:], ip.To4())
-	return hw.String()
 }

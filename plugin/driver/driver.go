@@ -16,8 +16,8 @@ package driver
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
-        "encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -133,18 +133,18 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		domainid = default_vd
 	}
 	DomainCreate(domainid.(string))
-        router := create.Options["com.docker.network.generic"].(map[string]interface{})["router"]
-        gatewayip := create.IPv4Data[0].Gateway.IP.String()
+	router := create.Options["com.docker.network.generic"].(map[string]interface{})["router"]
+	gatewayip := create.IPv4Data[0].Gateway.IP.String()
 	BridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
-        if router != nil {
-            cidr := create.IPv4Data[0].Pool.String()
-            _, ipnet, _ := net.ParseCIDR(cidr)
-            tm,_:=hex.DecodeString(ipnet.Mask.String())
-            netmask := fmt.Sprintf("%v.%v.%v.%v",tm[0],tm[1],tm[2],tm[3])
-            Log.Infof("Adding router interface for : ",router, gatewayip, netmask)
-            CreateRouterInterface(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
-        }
+	if router != nil {
+		cidr := create.IPv4Data[0].Pool.String()
+		_, ipnet, _ := net.ParseCIDR(cidr)
+		tm, _ := hex.DecodeString(ipnet.Mask.String())
+		netmask := fmt.Sprintf("%v.%v.%v.%v", tm[0], tm[1], tm[2], tm[3])
+		Log.Infof("Adding router interface for : ", router, gatewayip, netmask)
+		CreateRouterInterface(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
+	}
 
 	emptyResponse(w)
 
@@ -179,24 +179,14 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Infof("Create endpoint request %+v", &create)
-	Log.Infof("Create endpoint request %+v", create)
 
 	endID := create.EndpointID
 
 	ip := create.Interface.Address
 	Log.Infof("Got IP from IPAM %s", ip)
 
-	ip_mac, ipnet_mac, err_mac := net.ParseCIDR(ip)
-	if err_mac == nil {
-		ipnet_mac.IP = ip_mac
-	}
-	mac := makeMac(ipnet_mac.IP)
-
-	respIface := &api.EndpointInterface{
-		MacAddress: mac,
-	}
 	resp := &api.CreateEndpointResponse{
-		Interface: respIface,
+		Interface: &api.EndpointInterface{},
 	}
 
 	objectResponse(w, resp)
@@ -254,7 +244,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	if_local_name := "tap" + endID[:5]
 
 	//getting mac address of tap...
-	cmdStr0 := "ifconfig " + if_local_name + " | awk '/HWaddr/ {print $NF}'"
+	cmdStr0 := "ifconfig " + local.PeerName + " | awk '/HWaddr/ {print $NF}'"
 	Log.Infof("mac address cmd: %s", cmdStr0)
 	cmd0 := exec.Command("/bin/sh", "-c", cmdStr0)
 	var out0 bytes.Buffer
@@ -320,21 +310,8 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
-	//getting mac address of tap...
-	cmdStr0 := "ifconfig " + if_local_name + " | awk '/HWaddr/ {print $NF}'"
-	Log.Infof("mac address cmd: %s", cmdStr0)
-	cmd0 := exec.Command("/bin/sh", "-c", cmdStr0)
-	var out0 bytes.Buffer
-	cmd0.Stdout = &out0
-	err0 := cmd0.Run()
-	if err0 != nil {
-		Log.Error("Error thrown: ", err0)
-	}
-	mac := out0.String()
-	Log.Infof("output of cmd: %s\n", mac)
-
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name + " access_vm cont_" + l.EndpointID[:5] + " " + mac[:17]
+	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
 	Log.Infof("second cmd: %s", cmdStr1)
 	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
 	var out1 bytes.Buffer
