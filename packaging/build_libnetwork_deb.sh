@@ -10,7 +10,7 @@ PKG_DESCRIPTION="PLUMgrid Docker libnetwork plugin"
 PKG_ARCH="all"
 PKG_DEPS="golang (>=1.4), docker-engine (>=1.11)"
 
-BDIR_BASE=${WDIR}/${PKG_PREFIX}_"${PG_DEBVERSION}"_${PKG_ARCH}
+BDIR_BASE=${WDIR}/${PKG_PREFIX}_${PKG_DEBVERSION}_${PKG_ARCH}
 
 
 function gen_control_file(){
@@ -34,16 +34,16 @@ function build_package() {
   if [ $# -gt 0 ] ; then
     script_loc=$1
   else
-    script_loc=${WDIR}/${PKG_SRC_PATH}/debian-control
+    script_loc=${WDIR}/packaging/debian-control
   fi
   if [ -e ${script_loc}/${PKG_PREFIX}-postinst.sh ]; then
       cp -pf ${script_loc}/${PKG_PREFIX}-postinst.sh ${BDIR_BASE}/DEBIAN/postinst
-      chmod 555  ${BDIR_BASE}/DEBIAN/postinst
+      chmod 0755  ${BDIR_BASE}/DEBIAN/postinst
       echo "Found post-inst file ${script_loc}/${PKG_PREFIX}-postinst.sh"
   fi
   if [ -e ${script_loc}/${PKG_PREFIX}-prerm.sh ]; then
       cp -pf ${script_loc}/${PKG_PREFIX}-prerm.sh ${BDIR_BASE}/DEBIAN/prerm
-      chmod 555  ${BDIR_BASE}/DEBIAN/prerm
+      chmod 0755  ${BDIR_BASE}/DEBIAN/prerm
       echo "Found pre-rm file ${script_loc}/${PKG_PREFIX}-prerm.sh"
   fi
    
@@ -75,7 +75,9 @@ popd > /dev/null
 
 cp ${WDIR}/config.ini ${BDIR_BASE}/opt/pg/${PKG_PREFIX}/
 cp ${WDIR}/plugin/plumgrid ${BDIR_BASE}/opt/pg/${PKG_PREFIX}/libnetwork
-cp init ${BDIR_BASE}/etc/init.d/
+cp init ${BDIR_BASE}/etc/init.d/libnetwork
+
+chmod 0755 ${BDIR_BASE}/etc/init.d/libnetwork
 
 gen_control_file  "${PKG_PREFIX}"  "${PKG_DEBVERSION}"  "${PKG_ARCH}" "${PKG_DESCRIPTION}" "${PKG_DEPS}" ""
 
