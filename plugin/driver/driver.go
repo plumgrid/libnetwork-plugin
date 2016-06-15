@@ -16,8 +16,8 @@ package driver
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
-        "encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -133,18 +133,18 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		domainid = default_vd
 	}
 	DomainCreate(domainid.(string))
-        router := create.Options["com.docker.network.generic"].(map[string]interface{})["router"]
-        gatewayip := create.IPv4Data[0].Gateway.IP.String()
+	router := create.Options["com.docker.network.generic"].(map[string]interface{})["router"]
+	gatewayip := create.IPv4Data[0].Gateway.IP.String()
 	BridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
-        if router != nil {
-            cidr := create.IPv4Data[0].Pool.String()
-            _, ipnet, _ := net.ParseCIDR(cidr)
-            tm,_:=hex.DecodeString(ipnet.Mask.String())
-            netmask := fmt.Sprintf("%v.%v.%v.%v",tm[0],tm[1],tm[2],tm[3])
-            Log.Infof("Adding router interface for : ",router, gatewayip, netmask)
-            CreateRouterInterface(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
-        }
+	if router != nil {
+		cidr := create.IPv4Data[0].Pool.String()
+		_, ipnet, _ := net.ParseCIDR(cidr)
+		tm, _ := hex.DecodeString(ipnet.Mask.String())
+		netmask := fmt.Sprintf("%v.%v.%v.%v", tm[0], tm[1], tm[2], tm[3])
+		Log.Infof("Adding router interface for : ", router, gatewayip, netmask)
+		CreateRouterInterface(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
+	}
 
 	emptyResponse(w)
 
@@ -254,7 +254,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	if_local_name := "tap" + endID[:5]
 
 	//getting mac address of tap...
-	cmdStr0 := "ifconfig " + if_local_name + " | awk '/HWaddr/ {print $NF}'"
+	cmdStr0 := "ifconfig " + local.PeerName + " | awk '/HWaddr/ {print $NF}'"
 	Log.Infof("mac address cmd: %s", cmdStr0)
 	cmd0 := exec.Command("/bin/sh", "-c", cmdStr0)
 	var out0 bytes.Buffer
