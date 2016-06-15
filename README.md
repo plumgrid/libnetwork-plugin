@@ -29,6 +29,12 @@ Create a network on specific domain
 $ docker network create --subnet=10.0.0.0/24 -d plumgrid -o domain=DomainID net1
 ```
 
+You can choose to link the network to a specific router in PLUMgrid virtual domain as well,
+this is entirely optional and depending on your use case, you may use it.
+```
+$ docker network create --subnet=10.0.0.0/24 -d plumgrid -o router=router-1 net1
+```
+
 Run your containers using the Docker CLI
 ```
 $ docker run -itd --name=cont1 --net=net1 busybox
