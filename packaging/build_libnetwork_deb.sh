@@ -66,7 +66,7 @@ rm -rf ${BDIR_BASE} || true
 mkdir -p "${BDIR_BASE}/DEBIAN"
 mkdir -p "${BDIR_BASE}/opt/pg/${PKG_PREFIX}"
 mkdir -p "${BDIR_BASE}/etc/init.d"
-mkdir -p "${BDIR_BASE}/run/docker"
+mkdir -p "${BDIR_BASE}/run/docker/plugins"
 
 # Generate libnetwork binary
 pushd "${WDIR}" > /dev/null
