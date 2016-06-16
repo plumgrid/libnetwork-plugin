@@ -8,7 +8,7 @@ PKG_PREFIX=libnetwork
 PKG_DEBVERSION="1.0-1"
 PKG_DESCRIPTION="PLUMgrid Docker libnetwork plugin"
 PKG_ARCH="all"
-PKG_DEPS="golang (>=1.4), docker-engine (>=1.11)"
+PKG_DEPS="docker-engine (>=1.11)"
 
 BDIR_BASE=${WDIR}/${PKG_PREFIX}_${PKG_DEBVERSION}_${PKG_ARCH}
 

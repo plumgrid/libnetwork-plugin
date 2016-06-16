@@ -19,4 +19,4 @@ This will make the source files and create a new debian package under *$GOPATH/s
 $ dpkg -i libnetwork_<version>_all.deb
 ```
 
-**Note:** this package has a dependency on docker-engine and golang being pre-installed.
+**Note:** this package has a dependency on docker-engine being pre-installed.
