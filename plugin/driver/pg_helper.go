@@ -263,7 +263,6 @@ func DeleteRouterInterface(DomainID string, NetworkID string) {
 		for elem, _ := range links {
 			if strings.HasSuffix(elem, NetworkID) {
 				routerID = strings.Split(elem, NetworkID)[0]
-				RestCall("DELETE", url+"/link/"+routerID, nil)
 			}
 		}
 	}
