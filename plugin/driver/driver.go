@@ -164,6 +164,7 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	if domainid == "" {
 		domainid = default_vd
 	}
+	DeleteRouterInterface(domainid, delete.NetworkID)
 	BridgeDelete(delete.NetworkID, domainid)
 	DomainDelete(domainid)
 
