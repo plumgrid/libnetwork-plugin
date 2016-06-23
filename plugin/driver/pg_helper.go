@@ -241,6 +241,7 @@ func CreateRouterInterface(RouterName string, DomainId string, NetworkId string,
 func DeleteRouterInterface(DomainID string, NetworkID string) {
 
 	var routerID string
+	var rtr_ifc string
 	var links map[string]interface{}
 	var ne_data map[string]interface{}
 	url := "/0/connectivity/domain/" + DomainID
@@ -260,16 +261,24 @@ func DeleteRouterInterface(DomainID string, NetworkID string) {
 	}
 
 	if len(links) != 0 {
-		for elem, _ := range links {
-			if strings.HasSuffix(elem, NetworkID) {
-				routerID = strings.Split(elem, NetworkID)[0]
+		for att, att_info := range links {
+			att_1 := att_info.(map[string]interface{})["attachment1"].(string)
+			att_2 := att_info.(map[string]interface{})["attachment2"].(string)
+
+			if strings.Split(att_1, "/")[2][3:] == NetworkID {
+				routerID = strings.Split(att_2, "/")[2]
+				rtr_ifc = strings.Split(att_2, "/")[4]
+				RestCall("DELETE", url+"/link/"+att, nil)
+			} else if strings.Split(att_2, "/")[2][3:] == NetworkID {
+				routerID = strings.Split(att_1, "/")[2]
+				rtr_ifc = strings.Split(att_1, "/")[4]
+				RestCall("DELETE", url+"/link/"+att, nil)
 			}
 		}
 	}
 	if routerID != "" {
 		for elem, _ := range ne_data {
 			if elem == routerID {
-				rtr_ifc := NetworkID
 				ifc_url := url + "/ne/" + routerID + "/ifc/" + rtr_ifc
 				RestCall("DELETE", ifc_url, nil)
 			}
