@@ -185,9 +185,9 @@ func DomainDelete(domainID string) {
 	}
 }
 
-func GetNeId(NeName string, DomainId string) (NeId string) {
+func GetNeId(NeName string, DomainID string) (NeID string) {
 
-	url := "/0/connectivity/domain/" + DomainId + "/ne?configonly=true&level=1"
+	url := "/0/connectivity/domain/" + DomainID + "/ne?configonly=true&level=1"
 	body, _ := RestCall("GET", url, nil)
 	var ne_data map[string]interface{}
 	err := json.Unmarshal([]byte(body), &ne_data)
@@ -196,32 +196,32 @@ func GetNeId(NeName string, DomainId string) (NeId string) {
 	}
 	for nes, ne_val := range ne_data {
 		if ne_val.(map[string]interface{})["ne_dname"] == NeName {
-			NeId = nes
+			NeID = nes
 			break
 		}
 	}
 	return
 }
 
-func CreateRouterInterface(RouterName string, DomainId string, NetworkId string, IP string, Netmask string) {
+func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP string, Netmask string) {
 
-	RouterId := GetNeId(RouterName, DomainId)
-	CheckNeChildList(RouterId, DomainId, "ifc")
-	CheckNeChildList(NetworkName(NetworkId), DomainId, "ifc")
-	rtr_ifc := NetworkId
-	url := "/0/connectivity/domain/" + DomainId + "/ne/" + RouterId + "/ifc/" + rtr_ifc
+	ne_ID := GetNeId(NeName, DomainID)
+	CheckNeChildList(ne_ID, DomainID, "ifc")
+	CheckNeChildList(NetworkName(NetworkID), DomainID, "ifc")
+	ne_ifc := NetworkID
+	url := "/0/connectivity/domain/" + DomainID + "/ne/" + ne_ID + "/ifc/" + ne_ifc
 	data := []byte(`{"attachable": "true",
                          "list": "true",
                          "attach_type": "static,dynamic",
                          "mobility": "true",
-                         "ifc_name": "` + rtr_ifc + `",
+                         "ifc_name": "` + ne_ifc + `",
                          "ifc_type": "static",
                          "ip_address": "` + IP + `",
                          "ip_address_mask": "` + Netmask + `"}`)
 	RestCall("PUT", url, data)
 
-	net_ifc := RouterId
-	url = "/0/connectivity/domain/" + DomainId + "/ne/" + NetworkName(NetworkId) + "/ifc/" + net_ifc
+	net_ifc := ne_ID
+	url = "/0/connectivity/domain/" + DomainID + "/ne/" + NetworkName(NetworkID) + "/ifc/" + net_ifc
 	data = []byte(`{"attachable": "true",
                          "list": "true",
                          "attach_type": "static,dynamic",
@@ -229,23 +229,21 @@ func CreateRouterInterface(RouterName string, DomainId string, NetworkId string,
                          "ifc_type": "static"}`)
 	RestCall("PUT", url, data)
 
-	link_name := RouterId + NetworkId
-	url = "/0/connectivity/domain/" + DomainId + "/link/" + link_name
+	link_name := ne_ID + NetworkID
+	url = "/0/connectivity/domain/" + DomainID + "/link/" + link_name
 	data = []byte(`{"link_type": "static",
                          "link_name": "` + link_name + `",
-                         "attachment1": "/ne/` + RouterId + `/ifc/` + rtr_ifc + `",
-                         "attachment2": "/ne/` + NetworkName(NetworkId) + `/ifc/` + net_ifc + `"}`)
+                         "attachment1": "/ne/` + ne_ID + `/ifc/` + ne_ifc + `",
+                         "attachment2": "/ne/` + NetworkName(NetworkID) + `/ifc/` + net_ifc + `"}`)
 	RestCall("PUT", url, data)
 }
 
-func DeleteRouterInterface(DomainID string, NetworkID string) {
+func DeleteNetworkLinks(DomainID string, NetworkID string) {
 
-	var routerID string
-	var rtr_ifc string
-	var links map[string]interface{}
-	var ne_data map[string]interface{}
+	var ne_ID string
+	var ne_ifc string
 	url := "/0/connectivity/domain/" + DomainID
-	body, _ := RestCall("GET", url, nil)
+	body, _ := RestCall("GET", url+"?configonly=true", nil)
 	var domain_data map[string]interface{}
 	err := json.Unmarshal([]byte(body), &domain_data)
 	if err != nil {
@@ -253,34 +251,23 @@ func DeleteRouterInterface(DomainID string, NetworkID string) {
 	}
 	for domains, domain_val := range domain_data {
 		if domains == "link" {
-			links = domain_val.(map[string]interface{})
-		}
-		if domains == "ne" {
-			ne_data = domain_val.(map[string]interface{})
-		}
-	}
-
-	if len(links) != 0 {
-		for att, att_info := range links {
-			att_1 := att_info.(map[string]interface{})["attachment1"].(string)
-			att_2 := att_info.(map[string]interface{})["attachment2"].(string)
-
-			if strings.Split(att_1, "/")[2][3:] == NetworkID {
-				routerID = strings.Split(att_2, "/")[2]
-				rtr_ifc = strings.Split(att_2, "/")[4]
-				RestCall("DELETE", url+"/link/"+att, nil)
-			} else if strings.Split(att_2, "/")[2][3:] == NetworkID {
-				routerID = strings.Split(att_1, "/")[2]
-				rtr_ifc = strings.Split(att_1, "/")[4]
-				RestCall("DELETE", url+"/link/"+att, nil)
-			}
-		}
-	}
-	if routerID != "" {
-		for elem, _ := range ne_data {
-			if elem == routerID {
-				ifc_url := url + "/ne/" + routerID + "/ifc/" + rtr_ifc
-				RestCall("DELETE", ifc_url, nil)
+			links := domain_val.(map[string]interface{})
+			for att, att_info := range links {
+				att_1 := att_info.(map[string]interface{})["attachment1"].(string)
+				att_2 := att_info.(map[string]interface{})["attachment2"].(string)
+				if strings.Split(att_1, "/")[2][3:] == NetworkID {
+					ne_ID = strings.Split(att_2, "/")[2]
+					ne_ifc = strings.Split(att_2, "/")[4]
+					RestCall("DELETE", url+"/link/"+att, nil)
+					ifc_url := url + "/ne/" + ne_ID + "/ifc/" + ne_ifc
+					RestCall("DELETE", ifc_url, nil)
+				} else if strings.Split(att_2, "/")[2][3:] == NetworkID {
+					ne_ID = strings.Split(att_1, "/")[2]
+					ne_ifc = strings.Split(att_1, "/")[4]
+					RestCall("DELETE", url+"/link/"+att, nil)
+					ifc_url := url + "/ne/" + ne_ID + "/ifc/" + ne_ifc
+					RestCall("DELETE", ifc_url, nil)
+				}
 			}
 		}
 	}
@@ -291,9 +278,9 @@ func NetworkName(ID string) (name string) {
 	return
 }
 
-func CheckNeChildList(NeId string, DomainId string, childList string) {
+func CheckNeChildList(NeID string, DomainID string, childList string) {
 
-	url := "/0/connectivity/domain/" + DomainId + "/ne/" + NeId + "?configonly=true"
+	url := "/0/connectivity/domain/" + DomainID + "/ne/" + NeID + "?configonly=true"
 	body, _ := RestCall("GET", url, nil)
 	var ne_data map[string]interface{}
 	err := json.Unmarshal([]byte(body), &ne_data)

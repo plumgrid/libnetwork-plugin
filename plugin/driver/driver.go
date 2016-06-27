@@ -143,7 +143,7 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		tm, _ := hex.DecodeString(ipnet.Mask.String())
 		netmask := fmt.Sprintf("%v.%v.%v.%v", tm[0], tm[1], tm[2], tm[3])
 		Log.Infof("Adding router interface for : ", router, gatewayip, netmask)
-		CreateRouterInterface(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
+		CreateNetworkLink(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
 	}
 
 	emptyResponse(w)
@@ -164,7 +164,7 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	if domainid == "" {
 		domainid = default_vd
 	}
-	DeleteRouterInterface(domainid, delete.NetworkID)
+	DeleteNetworkLinks(domainid, delete.NetworkID)
 	BridgeDelete(delete.NetworkID, domainid)
 	DomainDelete(domainid)
 
