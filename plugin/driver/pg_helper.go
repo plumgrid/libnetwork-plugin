@@ -16,6 +16,7 @@ package driver
 
 import (
 	"encoding/json"
+	"strings"
 )
 
 func BridgeCreate(ID string, domainid string, gatewayip string) {
@@ -184,82 +185,113 @@ func DomainDelete(domainID string) {
 	}
 }
 
-func GetNeId(NeName string, DomainId string) (NeId string) {
+func GetNeId(NeName string, DomainID string) (NeID string) {
 
-        url := "/0/connectivity/domain/" + DomainId + "/ne?configonly=true&level=1"
-        body, _ := RestCall("GET", url, nil)
-        var ne_data map[string]interface{}
-        err := json.Unmarshal([]byte(body), &ne_data)
-        if err != nil {
-                panic(err)
-        }
-        for nes, ne_val := range ne_data {
-                if ne_val.(map[string]interface{})["ne_dname"] == NeName {
-                    NeId = nes
-                    break
-                }
-        }
-        return
+	url := "/0/connectivity/domain/" + DomainID + "/ne?configonly=true&level=1"
+	body, _ := RestCall("GET", url, nil)
+	var ne_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &ne_data)
+	if err != nil {
+		panic(err)
+	}
+	for nes, ne_val := range ne_data {
+		if ne_val.(map[string]interface{})["ne_dname"] == NeName {
+			NeID = nes
+			break
+		}
+	}
+	return
 }
 
-func CreateRouterInterface(RouterName string, DomainId string, NetworkId string, IP string, Netmask string) {
+func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP string, Netmask string) {
 
-        RouterId := GetNeId(RouterName, DomainId)
-        CheckNeChildList(RouterId, DomainId, "ifc")
-        CheckNeChildList(NetworkName(NetworkId), DomainId, "ifc")
-        rtr_ifc := NetworkId
-        url := "/0/connectivity/domain/" + DomainId + "/ne/" + RouterId + "/ifc/" + rtr_ifc
-        data := []byte(`{"attachable": "true",
+	ne_ID := GetNeId(NeName, DomainID)
+	CheckNeChildList(ne_ID, DomainID, "ifc")
+	CheckNeChildList(NetworkName(NetworkID), DomainID, "ifc")
+	ne_ifc := NetworkID
+	url := "/0/connectivity/domain/" + DomainID + "/ne/" + ne_ID + "/ifc/" + ne_ifc
+	data := []byte(`{"attachable": "true",
                          "list": "true",
                          "attach_type": "static,dynamic",
                          "mobility": "true",
-                         "ifc_name": "`+rtr_ifc+`",
+                         "ifc_name": "` + ne_ifc + `",
                          "ifc_type": "static",
-                         "ip_address": "`+IP+`",
-                         "ip_address_mask": "`+Netmask+`"}`)
-        RestCall("PUT", url, data)
+                         "ip_address": "` + IP + `",
+                         "ip_address_mask": "` + Netmask + `"}`)
+	RestCall("PUT", url, data)
 
-        net_ifc := RouterId
-        url = "/0/connectivity/domain/" + DomainId + "/ne/" + NetworkName(NetworkId) + "/ifc/" + net_ifc
-        data = []byte(`{"attachable": "true",
+	net_ifc := ne_ID
+	url = "/0/connectivity/domain/" + DomainID + "/ne/" + NetworkName(NetworkID) + "/ifc/" + net_ifc
+	data = []byte(`{"attachable": "true",
                          "list": "true",
                          "attach_type": "static,dynamic",
                          "mobility": "true",
                          "ifc_type": "static"}`)
-        RestCall("PUT", url, data)
+	RestCall("PUT", url, data)
 
-        link_name := RouterId + NetworkId
-        url = "/0/connectivity/domain/" + DomainId + "/link/" + link_name
-        data = []byte(`{"link_type": "static",
-                         "link_name": "`+link_name+`",
-                         "attachment1": "/ne/` + RouterId + `/ifc/` + rtr_ifc + `",
-                         "attachment2": "/ne/` + NetworkName(NetworkId) + `/ifc/` + net_ifc + `"}`)
-        RestCall("PUT", url, data)
+	link_name := ne_ID + NetworkID
+	url = "/0/connectivity/domain/" + DomainID + "/link/" + link_name
+	data = []byte(`{"link_type": "static",
+                         "link_name": "` + link_name + `",
+                         "attachment1": "/ne/` + ne_ID + `/ifc/` + ne_ifc + `",
+                         "attachment2": "/ne/` + NetworkName(NetworkID) + `/ifc/` + net_ifc + `"}`)
+	RestCall("PUT", url, data)
 }
 
-func DeleteRouterInterface(RouterName string, DomainID string, NetworkID string) {
+func DeleteNetworkLinks(DomainID string, NetworkID string) {
 
+	var ne_ID string
+	var ne_ifc string
+	url := "/0/connectivity/domain/" + DomainID
+	body, _ := RestCall("GET", url+"?configonly=true", nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+	for domains, domain_val := range domain_data {
+		if domains == "link" {
+			links := domain_val.(map[string]interface{})
+			for att, att_info := range links {
+				att_1 := att_info.(map[string]interface{})["attachment1"].(string)
+				att_2 := att_info.(map[string]interface{})["attachment2"].(string)
+				if strings.Split(att_1, "/")[2][3:] == NetworkID {
+					ne_ID = strings.Split(att_2, "/")[2]
+					ne_ifc = strings.Split(att_2, "/")[4]
+					RestCall("DELETE", url+"/link/"+att, nil)
+					ifc_url := url + "/ne/" + ne_ID + "/ifc/" + ne_ifc
+					RestCall("DELETE", ifc_url, nil)
+				} else if strings.Split(att_2, "/")[2][3:] == NetworkID {
+					ne_ID = strings.Split(att_1, "/")[2]
+					ne_ifc = strings.Split(att_1, "/")[4]
+					RestCall("DELETE", url+"/link/"+att, nil)
+					ifc_url := url + "/ne/" + ne_ID + "/ifc/" + ne_ifc
+					RestCall("DELETE", ifc_url, nil)
+				}
+			}
+		}
+	}
 }
 
 func NetworkName(ID string) (name string) {
-        name = "bri" + ID
-        return
+	name = "bri" + ID
+	return
 }
 
-func CheckNeChildList(NeId string, DomainId string, childList string) {
+func CheckNeChildList(NeID string, DomainID string, childList string) {
 
-        url := "/0/connectivity/domain/" +  DomainId + "/ne/" + NeId + "?configonly=true"
-        body, _ := RestCall("GET", url, nil)
-        var ne_data map[string]interface{}
-        err := json.Unmarshal([]byte(body), &ne_data)
-        if err != nil {
-                panic(err)
-        }
-        if _, ok := ne_data[childList]; ok {
-                return
-        } else {
-                data := []byte(`{}`)
-                RestCall("PUT", url + "/" + childList, data)
-                return
-        }
+	url := "/0/connectivity/domain/" + DomainID + "/ne/" + NeID + "?configonly=true"
+	body, _ := RestCall("GET", url, nil)
+	var ne_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &ne_data)
+	if err != nil {
+		panic(err)
+	}
+	if _, ok := ne_data[childList]; ok {
+		return
+	} else {
+		data := []byte(`{}`)
+		RestCall("PUT", url+"/"+childList, data)
+		return
+	}
 }
