@@ -147,7 +147,7 @@ func DomainCreate(domainID string) {
 	data = []byte(`{"rule": {
 				"rule_` + domainID + `": {
 					"pgtag1": "` + domainID + `",
-					"log_ifc_type": "ACCESS_VM"}}}`)
+					"log_ifc_type": "ACCESS_CONTAINER"}}}`)
 
 	RestCall("PUT", url, data)
 }
