@@ -153,12 +153,12 @@ func DomainCreate(domainID string) {
 	data := []byte(`{"containers": {
 				"` + domainID + `": {
 					"enable": "True",
-					"qos_marking": "9",
 					"context": "` + domainID + `",
-					"type": "Gold",
-					"property": "Container ` + domainID + ` Property",
 					"domains": {}, "rules": {}}}}`)
+	RestCall("PUT", url, data)
 
+	url = "/0/tenant_manager/metaconfig/" + domainID
+	data = []byte(`{}`)
 	RestCall("PUT", url, data)
 
 	url = "/0/tunnel_service/vnd_config/" + domainID
@@ -210,7 +210,10 @@ func DomainDelete(domainID string) {
 				url = "/0/tunnel_service/vnd_config/" + domainID
 				RestCall("DELETE", url, nil)
 
-				url = "/0/tenant_manager/tenants" + "/" + domainID
+				url = "/0/tenant_manager/metaconfig/" + domainID
+				RestCall("DELETE", url, nil)
+
+				url = "/0/tenant_manager/tenants/" + domainID
 				RestCall("DELETE", url, nil)
 			}
 		}
@@ -325,5 +328,60 @@ func CheckNeChildList(NeID string, DomainID string, childList string) {
 		data := []byte(`{}`)
 		RestCall("PUT", url+"/"+childList, data)
 		return
+	}
+}
+
+func AddMetaconfig(domainID string, netID string, deviceID string, endpointID string, macaddr string) {
+
+	url := "/0/tenant_manager/metaconfig/" + domainID + "?configonly=true"
+	body, _ := RestCall("GET", url, nil)
+	var tm_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &tm_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for device, _ := range tm_data["workloads"].(map[string]interface{}) {
+		if device == deviceID {
+			url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID + "/prop/" + endpointID
+			data := []byte(`{"phy_address": "` + macaddr + `",
+					 "hint": "` + netID + `"}`)
+			RestCall("PUT", url, data)
+			return
+		}
+	}
+
+	url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID
+	data := []byte(`{"ne_type": "container",
+			 "ne_dname": "none",
+			 "prop": {
+				"` + endpointID + `": {
+						"phy_address": "` + macaddr + `",
+						"hint": "` + netID + `"}}}`)
+	RestCall("PUT", url, data)
+}
+
+func RemoveMetaconfig(domainID string, netID string, endpointID string) {
+
+	url := "/0/tenant_manager/metaconfig/" + domainID + "?configonly=true"
+	body, _ := RestCall("GET", url, nil)
+	var tm_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &tm_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for device, prop := range tm_data["workloads"].(map[string]interface{}) {
+		for endpoint, _ := range prop.(map[string]interface{})["prop"].(map[string]interface{}) {
+			if endpoint == endpointID {
+				if len(prop.(map[string]interface{})["prop"].(map[string]interface{})) < 2 {
+					url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device
+					RestCall("DELETE", url, nil)
+					return
+				}
+				url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device + "/prop/" + endpoint
+				RestCall("DELETE", url, nil)
+			}
+		}
 	}
 }

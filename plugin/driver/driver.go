@@ -309,6 +309,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
+	AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac[:17])
+
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 }
@@ -321,6 +323,8 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Infof("Leave request: %+v", &l)
+
+	domainid, bridgeID := FindDomainFromNetwork(l.NetworkID)
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
@@ -352,6 +356,9 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := netlink.LinkDel(local); err != nil {
 		Log.Warningf("unable to delete veth on leave: %s", err)
 	}
+
+	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
+
 	emptyResponse(w)
 	Log.Infof("Leave %s:%s", l.NetworkID, l.EndpointID)
 }
