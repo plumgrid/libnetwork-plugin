@@ -27,6 +27,7 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 					"action_text": "create_and_link_ifc(DYN_1)"}
 				},
 				"ifc": {},
+				"metadata": "` + ID + `",
 				"mobility": "true",
 				"ne_description": "PLUMgrid Bridge",
 				"ne_dname": "net-` + ID[:10] + `",
@@ -45,7 +46,7 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 						"rules` + ID + `": {
 							"add_context": "",
 							"criteria": "pgtag2",
-							"match": "bridge-` + ID[:10] + `"
+							"match": "bri` + ID + `"
 						}
 					}
 	}`)
@@ -54,6 +55,13 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 
 	url = "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
 	data = []byte(`{"ne_metadata": "` + gatewayip + `"}`)
+	RestCall("PUT", url, data)
+}
+
+func AddGatewayInfo(ID string, domainid string, gatewayip string) {
+
+	url := "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
+	data := []byte(`{"ne_metadata": "` + gatewayip + `"}`)
 	RestCall("PUT", url, data)
 }
 
@@ -69,7 +77,7 @@ func BridgeDelete(ID string, domainid string) {
 	RestCall("DELETE", url, nil)
 }
 
-func FindDomainFromNetwork(ID string) (domainid string) {
+func AddNetworkInfo(dNetwork string, neID string) {
 
 	url := "/0/connectivity/domain?configonly=true&level=3"
 	body, _ := RestCall("GET", url, nil)
@@ -80,9 +88,33 @@ func FindDomainFromNetwork(ID string) (domainid string) {
 	}
 	for domains, domain_val := range domain_data {
 		if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
-			if _, ok := nes.(map[string]interface{})["bri"+ID]; ok {
-				domainid = domains
+			if ne, ok := nes.(map[string]interface{})[neID]; ok {
+				ne.(map[string]interface{})["metadata"] = dNetwork
+				ne_data, _ := json.Marshal(ne)
+				RestCall("PUT", "/0/connectivity/domain/"+domains+"/ne/"+neID, ne_data)
 				break
+			}
+		}
+	}
+}
+
+func FindDomainFromNetwork(ID string) (domainid string, netid string) {
+
+	url := "/0/connectivity/domain?configonly=true&level=3"
+	body, _ := RestCall("GET", url, nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+	for domains, domain_val := range domain_data {
+		if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
+			for ne, data := range nes.(map[string]interface{}) {
+				if data.(map[string]interface{})["metadata"] == ID {
+					domainid = domains
+					netid = ne
+					break
+				}
 			}
 		}
 	}
