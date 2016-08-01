@@ -77,7 +77,7 @@ func RestHelper(method string, uri string, data []byte) ([]byte, error) {
 	url := "https://" + vip
 
 	rest_url := url + uri
-	Log.Info("URL:>", rest_url)
+	Log.Infof("%s call on %s", method, rest_url)
 
 	req, err := http.NewRequest(method, rest_url, bytes.NewBuffer(data))
 	req.Header.Set("Accept", "application/json")

@@ -26,6 +26,7 @@ import (
 
 	Log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/drivers/remote/api"
+	"github.com/docker/libnetwork/netlabel"
 	docker "github.com/fsouza/go-dockerclient"
 
 	"github.com/gorilla/mux"
@@ -128,13 +129,25 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Create network request %+v", &create)
 
-	domainid := create.Options["com.docker.network.generic"].(map[string]interface{})["domain"]
+	domainid := create.Options[netlabel.GenericData].(map[string]interface{})["domain"]
 	if domainid == nil {
 		domainid = default_vd
 	}
 	DomainCreate(domainid.(string))
-	router := create.Options["com.docker.network.generic"].(map[string]interface{})["router"]
+
 	gatewayip := create.IPv4Data[0].Gateway.IP.String()
+	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
+
+	if neName != nil {
+		neID := GetNeId(neName.(string), domainid.(string))
+		AddNetworkInfo(create.NetworkID, neID)
+		AddGatewayInfo(create.NetworkID, domainid.(string), gatewayip)
+		emptyResponse(w)
+
+		return
+	}
+
+	router := create.Options[netlabel.GenericData].(map[string]interface{})["router"]
 	BridgeCreate(create.NetworkID, domainid.(string), gatewayip)
 
 	if router != nil {
@@ -160,7 +173,7 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	Log.Infof("Delete network request: %+v", &delete)
 
-	domainid := FindDomainFromNetwork(delete.NetworkID)
+	domainid, _ := FindDomainFromNetwork(delete.NetworkID)
 	if domainid == "" {
 		domainid = default_vd
 	}
@@ -229,7 +242,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	netID := j.NetworkID
 	endID := j.EndpointID
-	domainid := FindDomainFromNetwork(netID)
+	domainid, bridgeID := FindDomainFromNetwork(netID)
 	if domainid == "" {
 		domainid = default_vd
 	}
@@ -270,7 +283,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	Log.Infof("output of cmd: %+v\n", out1.String())
 
 	//second command {up the port on plumgrid}
-	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:2] + " " + mac[:17] + " pgtag2=bridge-" + netID[:10] + " pgtag1=" + domainid
+	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:2] + " " + mac[:17] + " pgtag2=" + bridgeID + " pgtag1=" + domainid
 	Log.Infof("third cmd: %s", cmdStr2)
 	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
 	var out2 bytes.Buffer
@@ -296,6 +309,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
+	AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac[:17])
+
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 }
@@ -308,6 +323,8 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Infof("Leave request: %+v", &l)
+
+	domainid, bridgeID := FindDomainFromNetwork(l.NetworkID)
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
@@ -339,6 +356,9 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := netlink.LinkDel(local); err != nil {
 		Log.Warningf("unable to delete veth on leave: %s", err)
 	}
+
+	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
+
 	emptyResponse(w)
 	Log.Infof("Leave %s:%s", l.NetworkID, l.EndpointID)
 }

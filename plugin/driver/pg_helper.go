@@ -27,6 +27,7 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 					"action_text": "create_and_link_ifc(DYN_1)"}
 				},
 				"ifc": {},
+				"metadata": "` + ID + `",
 				"mobility": "true",
 				"ne_description": "PLUMgrid Bridge",
 				"ne_dname": "net-` + ID[:10] + `",
@@ -45,7 +46,7 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 						"rules` + ID + `": {
 							"add_context": "",
 							"criteria": "pgtag2",
-							"match": "bridge-` + ID[:10] + `"
+							"match": "bri` + ID + `"
 						}
 					}
 	}`)
@@ -54,6 +55,13 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 
 	url = "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
 	data = []byte(`{"ne_metadata": "` + gatewayip + `"}`)
+	RestCall("PUT", url, data)
+}
+
+func AddGatewayInfo(ID string, domainid string, gatewayip string) {
+
+	url := "/0/connectivity/domain_prop/" + domainid + "/ne/brii" + ID
+	data := []byte(`{"ne_metadata": "` + gatewayip + `"}`)
 	RestCall("PUT", url, data)
 }
 
@@ -69,7 +77,7 @@ func BridgeDelete(ID string, domainid string) {
 	RestCall("DELETE", url, nil)
 }
 
-func FindDomainFromNetwork(ID string) (domainid string) {
+func AddNetworkInfo(dNetwork string, neID string) {
 
 	url := "/0/connectivity/domain?configonly=true&level=3"
 	body, _ := RestCall("GET", url, nil)
@@ -80,9 +88,33 @@ func FindDomainFromNetwork(ID string) (domainid string) {
 	}
 	for domains, domain_val := range domain_data {
 		if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
-			if _, ok := nes.(map[string]interface{})["bri"+ID]; ok {
-				domainid = domains
+			if ne, ok := nes.(map[string]interface{})[neID]; ok {
+				ne.(map[string]interface{})["metadata"] = dNetwork
+				ne_data, _ := json.Marshal(ne)
+				RestCall("PUT", "/0/connectivity/domain/"+domains+"/ne/"+neID, ne_data)
 				break
+			}
+		}
+	}
+}
+
+func FindDomainFromNetwork(ID string) (domainid string, netid string) {
+
+	url := "/0/connectivity/domain?configonly=true&level=3"
+	body, _ := RestCall("GET", url, nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+	for domains, domain_val := range domain_data {
+		if nes, ok := domain_val.(map[string]interface{})["ne"]; ok {
+			for ne, data := range nes.(map[string]interface{}) {
+				if data.(map[string]interface{})["metadata"] == ID {
+					domainid = domains
+					netid = ne
+					break
+				}
 			}
 		}
 	}
@@ -121,12 +153,12 @@ func DomainCreate(domainID string) {
 	data := []byte(`{"containers": {
 				"` + domainID + `": {
 					"enable": "True",
-					"qos_marking": "9",
 					"context": "` + domainID + `",
-					"type": "Gold",
-					"property": "Container ` + domainID + ` Property",
 					"domains": {}, "rules": {}}}}`)
+	RestCall("PUT", url, data)
 
+	url = "/0/tenant_manager/metaconfig/" + domainID
+	data = []byte(`{}`)
 	RestCall("PUT", url, data)
 
 	url = "/0/tunnel_service/vnd_config/" + domainID
@@ -178,7 +210,10 @@ func DomainDelete(domainID string) {
 				url = "/0/tunnel_service/vnd_config/" + domainID
 				RestCall("DELETE", url, nil)
 
-				url = "/0/tenant_manager/tenants" + "/" + domainID
+				url = "/0/tenant_manager/metaconfig/" + domainID
+				RestCall("DELETE", url, nil)
+
+				url = "/0/tenant_manager/tenants/" + domainID
 				RestCall("DELETE", url, nil)
 			}
 		}
@@ -293,5 +328,59 @@ func CheckNeChildList(NeID string, DomainID string, childList string) {
 		data := []byte(`{}`)
 		RestCall("PUT", url+"/"+childList, data)
 		return
+	}
+}
+
+func AddMetaconfig(domainID string, netID string, deviceID string, endpointID string, macaddr string) {
+
+	url := "/0/tenant_manager/metaconfig/" + domainID + "?configonly=true"
+	body, _ := RestCall("GET", url, nil)
+	var tm_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &tm_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for device, _ := range tm_data["workloads"].(map[string]interface{}) {
+		if device == deviceID {
+			url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID + "/prop/" + endpointID
+			data := []byte(`{"phy_address": "` + macaddr + `",
+					 "hint": "` + netID + `"}`)
+			RestCall("PUT", url, data)
+			return
+		}
+	}
+
+	url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID
+	data := []byte(`{"ne_type": "container",
+			 "prop": {
+				"` + endpointID + `": {
+						"phy_address": "` + macaddr + `",
+						"hint": "` + netID + `"}}}`)
+	RestCall("PUT", url, data)
+}
+
+func RemoveMetaconfig(domainID string, netID string, endpointID string) {
+
+	url := "/0/tenant_manager/metaconfig/" + domainID + "?configonly=true"
+	body, _ := RestCall("GET", url, nil)
+	var tm_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &tm_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for device, prop := range tm_data["workloads"].(map[string]interface{}) {
+		for endpoint, _ := range prop.(map[string]interface{})["prop"].(map[string]interface{}) {
+			if endpoint == endpointID {
+				if len(prop.(map[string]interface{})["prop"].(map[string]interface{})) < 2 {
+					url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device
+					RestCall("DELETE", url, nil)
+					return
+				}
+				url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device + "/prop/" + endpoint
+				RestCall("DELETE", url, nil)
+			}
+		}
 	}
 }

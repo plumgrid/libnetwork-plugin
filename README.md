@@ -35,6 +35,12 @@ this is entirely optional and depending on your use case, you may use it.
 $ docker network create --subnet=10.0.0.0/24 -d plumgrid -o router=router-1 net1
 ```
 
+You can also choose to link the network to a specific bridge in PLUMgrid virtual domain,
+this also is optional and can be used depending upon your use case.
+```
+$ docker network create --subnet=10.0.0.0/24 -d plumgrid -o bridge=bridge-1 net1
+```
+
 Run your containers using the Docker CLI
 ```
 $ docker run -itd --name=cont1 --net=net1 busybox
