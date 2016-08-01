@@ -353,7 +353,6 @@ func AddMetaconfig(domainID string, netID string, deviceID string, endpointID st
 
 	url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID
 	data := []byte(`{"ne_type": "container",
-			 "ne_dname": "none",
 			 "prop": {
 				"` + endpointID + `": {
 						"phy_address": "` + macaddr + `",
