@@ -247,7 +247,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		domainid = default_vd
 	}
 	gatewayIP := FindNetworkGateway(domainid, netID)
-	// create and attach local name to the bridge
+
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
@@ -257,42 +257,31 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + endID[:5]
 
-	//getting mac address of tap...
-	cmdStr0 := "ifconfig " + local.PeerName + " | awk '/HWaddr/ {print $NF}'"
-	Log.Infof("mac address cmd: %s", cmdStr0)
-	cmd0 := exec.Command("/bin/sh", "-c", cmdStr0)
-	var out0 bytes.Buffer
-	cmd0.Stdout = &out0
-	err0 := cmd0.Run()
-	if err0 != nil {
-		Log.Error("Error thrown: ", err0)
-	}
-	mac := out0.String()
+	link, _ := netlink.LinkByName(local.PeerName)
+	mac := link.Attrs().HardwareAddr.String()
 	Log.Infof("output of cmd: %s\n", mac)
 
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway add_port " + if_local_name
-	Log.Infof("second cmd: %s", cmdStr1)
-	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
-	var out1 bytes.Buffer
-	cmd1.Stdout = &out1
-	err1 := cmd1.Run()
-	if err1 != nil {
-		Log.Error("Error thrown: ", err1)
+	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway add_port " + if_local_name
+	Log.Infof("second cmd: %s", cmdStr)
+	cmd := exec.Command("/bin/sh", "-c", cmdStr)
+	var addport bytes.Buffer
+	cmd.Stdout = &addport
+	if err := cmd.Run(); err != nil {
+		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", out1.String())
+	Log.Infof("output of cmd: %+v\n", addport.String())
 
 	//second command {up the port on plumgrid}
-	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:2] + " " + mac[:17] + " pgtag2=" + bridgeID + " pgtag1=" + domainid
-	Log.Infof("third cmd: %s", cmdStr2)
-	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
-	var out2 bytes.Buffer
-	cmd2.Stdout = &out2
-	err2 := cmd2.Run()
-	if err2 != nil {
-		Log.Error("Error thrown: ", err2)
+	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:8] + " " + mac + " pgtag2=" + bridgeID + " pgtag1=" + domainid
+	Log.Infof("third cmd: %s", cmdStr)
+	cmd = exec.Command("/bin/sh", "-c", cmdStr)
+	var ifup bytes.Buffer
+	cmd.Stdout = &ifup
+	if err := cmd.Run(); err != nil {
+		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", out2.String())
+	Log.Infof("output of cmd: %+v\n", ifup.String())
 
 	if netlink.LinkSetUp(local) != nil {
 		errorResponsef(w, `unable to bring veth up`)
@@ -309,7 +298,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
-	AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac[:17])
+	AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac)
 
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
@@ -329,28 +318,26 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if_local_name := "tap" + l.EndpointID[:5]
 
 	//first command {adding port on plumgrid}
-	cmdStr1 := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
-	Log.Infof("second cmd: %s", cmdStr1)
-	cmd1 := exec.Command("/bin/sh", "-c", cmdStr1)
-	var out1 bytes.Buffer
-	cmd1.Stdout = &out1
-	err1 := cmd1.Run()
-	if err1 != nil {
-		Log.Error("Error thrown: ", err1)
+	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
+	Log.Infof("second cmd: %s", cmdStr)
+	cmd := exec.Command("/bin/sh", "-c", cmdStr)
+	var ifdown bytes.Buffer
+	cmd.Stdout = &ifdown
+	if err := cmd.Run(); err != nil {
+		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", out1.String())
+	Log.Infof("output of cmd: %+v\n", ifdown.String())
 
 	//second command {up the port on plumgrid}
-	cmdStr2 := "sudo /opt/pg/bin/ifc_ctl gateway del_port " + if_local_name
-	Log.Infof("third cmd: %s", cmdStr2)
-	cmd2 := exec.Command("/bin/sh", "-c", cmdStr2)
-	var out2 bytes.Buffer
-	cmd2.Stdout = &out2
-	err2 := cmd2.Run()
-	if err2 != nil {
-		Log.Error("Error thrown: ", err2)
+	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway del_port " + if_local_name
+	Log.Infof("third cmd: %s", cmdStr)
+	cmd = exec.Command("/bin/sh", "-c", cmdStr)
+	var delport bytes.Buffer
+	cmd.Stdout = &delport
+	if err := cmd.Run(); err != nil {
+		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", out2.String())
+	Log.Infof("output of cmd: %+v\n", delport.String())
 
 	local := vethPair(l.EndpointID[:5])
 	if err := netlink.LinkDel(local); err != nil {
