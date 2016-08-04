@@ -199,8 +199,19 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	ip := create.Interface.Address
 	Log.Infof("Got IP from IPAM %s", ip)
 
+	local := vethPair(endID[:5])
+	if err := netlink.LinkAdd(local); err != nil {
+		Log.Error(err)
+		errorResponsef(w, "could not create veth pair")
+		return
+	}
+	link, _ := netlink.LinkByName(local.PeerName)
+	mac := link.Attrs().HardwareAddr.String()
+
 	resp := &api.CreateEndpointResponse{
-		Interface: &api.EndpointInterface{},
+		Interface: &api.EndpointInterface{
+			MacAddress: mac,
+		},
 	}
 
 	objectResponse(w, resp)
@@ -215,6 +226,12 @@ func (driver *driver) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Log.Debugf("Delete endpoint request: %+v", &delete)
+
+	local := vethPair(delete.EndpointID[:5])
+	if err := netlink.LinkDel(local); err != nil {
+		Log.Warningf("unable to delete veth on leave: %s", err)
+	}
+
 	emptyResponse(w)
 	Log.Infof("Delete endpoint %s", delete.EndpointID)
 }
@@ -249,11 +266,6 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	gatewayIP := FindNetworkGateway(domainid, netID)
 
 	local := vethPair(endID[:5])
-	if err := netlink.LinkAdd(local); err != nil {
-		Log.Error(err)
-		errorResponsef(w, "could not create veth pair")
-		return
-	}
 
 	if_local_name := "tap" + endID[:5]
 
@@ -338,11 +350,6 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		Log.Error("Error thrown: ", err)
 	}
 	Log.Infof("output of cmd: %+v\n", delport.String())
-
-	local := vethPair(l.EndpointID[:5])
-	if err := netlink.LinkDel(local); err != nil {
-		Log.Warningf("unable to delete veth on leave: %s", err)
-	}
 
 	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
 
