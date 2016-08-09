@@ -14,6 +14,7 @@ NAME=libnetwork
 
 PIDFILE=/var/run/$NAME.pid
 LOGFILE=/var/log/$NAME.log
+SOCKDIR=/var/run/docker/plugins
 
 start() {
   if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE); then
@@ -21,6 +22,7 @@ start() {
     return 1
   fi
   echo 'Starting service…' >&2
+  mkdir -p $SOCKDIR
   local CMD="$SCRIPT &> \"$LOGFILE\" & echo \$!"
   su -c "$CMD" $RUNAS > "$PIDFILE"
   echo 'Service started' >&2
@@ -42,7 +44,7 @@ status() {
         PID=$(cat $PIDFILE)
             if [ -z "$(ps axf | grep ${PID} | grep -v grep)" ]; then
                 printf "%s\n" "The process appears to be dead but pidfile still exists"
-            else    
+            else
                 echo "Running, the PID is $PID"
             fi
     else
