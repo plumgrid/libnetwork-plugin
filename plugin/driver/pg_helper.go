@@ -41,7 +41,7 @@ func BridgeCreate(ID string, domainid string, gatewayip string) {
 	data = []byte(`{"mark_disabled": false,
 			"ne_dest": "/ne/bri` + ID + `/action/action1",
 			"ne_dname": "cont-` + ID[10:] + `",
-			"ne_type": "cnf-vmgroup",
+			"ne_type": "cnf-contgroup",
 					"rule": {
 						"rules` + ID + `": {
 							"add_context": "",
