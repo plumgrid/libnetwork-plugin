@@ -139,8 +139,7 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
 
 	if neName != nil {
-		neID := GetNeId(neName.(string), domainid.(string))
-		AddNetworkInfo(create.NetworkID, neID)
+                AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string))
 		AddGatewayInfo(create.NetworkID, domainid.(string), gatewayip)
 		emptyResponse(w)
 
