@@ -271,29 +271,29 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	link, _ := netlink.LinkByName(local.PeerName)
 	mac := link.Attrs().HardwareAddr.String()
-	Log.Infof("output of cmd: %s\n", mac)
+	Log.Infof("mac address: %s\n", mac)
 
 	//first command {adding port on plumgrid}
 	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway add_port " + if_local_name
-	Log.Infof("second cmd: %s", cmdStr)
+	Log.Infof("addport cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 	var addport bytes.Buffer
 	cmd.Stdout = &addport
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", addport.String())
+	Log.Infof("output: %+v\n", addport.String())
 
 	//second command {up the port on plumgrid}
 	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:8] + " " + mac + " pgtag2=" + bridgeID + " pgtag1=" + domainid
-	Log.Infof("third cmd: %s", cmdStr)
+	Log.Infof("ifup cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
 	var ifup bytes.Buffer
 	cmd.Stdout = &ifup
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", ifup.String())
+	Log.Infof("output: %+v\n", ifup.String())
 
 	if netlink.LinkSetUp(local) != nil {
 		errorResponsef(w, `unable to bring veth up`)
@@ -331,25 +331,25 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	//first command {adding port on plumgrid}
 	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
-	Log.Infof("second cmd: %s", cmdStr)
+	Log.Infof("ifdown cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 	var ifdown bytes.Buffer
 	cmd.Stdout = &ifdown
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", ifdown.String())
+	Log.Infof("output: %+v\n", ifdown.String())
 
 	//second command {up the port on plumgrid}
 	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway del_port " + if_local_name
-	Log.Infof("third cmd: %s", cmdStr)
+	Log.Infof("delport cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
 	var delport bytes.Buffer
 	cmd.Stdout = &delport
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output of cmd: %+v\n", delport.String())
+	Log.Infof("output: %+v\n", delport.String())
 
 	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
 
