@@ -153,6 +153,7 @@ func DomainCreate(domainID string) {
 				"` + domainID + `": {
 					"enable": "True",
 					"context": "` + domainID + `",
+                                        "vd_display_name": "` + domainID + `",
 					"domains": {}, "rules": {}}}}`)
 	RestCall("PUT", url, data)
 
