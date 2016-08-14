@@ -139,7 +139,7 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
 
 	if neName != nil {
-                AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string))
+		AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string))
 		AddGatewayInfo(create.NetworkID, domainid.(string), gatewayip)
 		emptyResponse(w)
 
@@ -177,6 +177,7 @@ func (driver *driver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 		domainid = default_vd
 	}
 	DeleteNetworkLinks(domainid, delete.NetworkID)
+	DeleteAttachedLB(domainid, delete.NetworkID)
 	BridgeDelete(delete.NetworkID, domainid)
 	DomainDelete(domainid)
 
