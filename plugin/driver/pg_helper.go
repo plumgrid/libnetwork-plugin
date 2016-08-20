@@ -78,23 +78,23 @@ func BridgeDelete(ID string, domainid string) {
 }
 
 func AddNetworkInfo(dNetwork string, neName string, domain string) {
-        id := GetNeId(neName, domain)
-        var neId string
-        if id == "" {
-            neId = neName
-        } else {
-            neId = id
-        }
-        url := "/0/connectivity/domain/" + domain + "/ne/" + neId
-        body, _ := RestCall("GET", url+"?configonly=true", nil)
-        var netData map[string]interface{}
-        err := json.Unmarshal([]byte(body), &netData)
-        if err != nil {
-                panic(err)
-        }
-        netData["metadata"] = dNetwork
-        finalData, _ := json.Marshal(netData)
-        RestCall("PUT", url, finalData)
+	id := GetNeId(neName, domain)
+	var neId string
+	if id == "" {
+		neId = neName
+	} else {
+		neId = id
+	}
+	url := "/0/connectivity/domain/" + domain + "/ne/" + neId
+	body, _ := RestCall("GET", url+"?configonly=true", nil)
+	var netData map[string]interface{}
+	err := json.Unmarshal([]byte(body), &netData)
+	if err != nil {
+		panic(err)
+	}
+	netData["metadata"] = dNetwork
+	finalData, _ := json.Marshal(netData)
+	RestCall("PUT", url, finalData)
 }
 
 func FindDomainFromNetwork(ID string) (domainid string, netid string) {
@@ -222,20 +222,20 @@ func DomainDelete(domainID string) {
 
 func GetNeId(NeName string, DomainID string) (NeID string) {
 
-        url := "/0/connectivity/domain/" + DomainID + "/ne?configonly=true&level=1"
-        body, _ := RestCall("GET", url, nil)
-        var ne_data map[string]interface{}
-        err := json.Unmarshal([]byte(body), &ne_data)
-        if err != nil {
-                panic(err)
-        }
-        for nes, ne_val := range ne_data {
-                if ne_val.(map[string]interface{})["ne_dname"] == NeName {
-                        NeID = nes
-                        return NeID
-                }
-        }
-        return ""
+	url := "/0/connectivity/domain/" + DomainID + "/ne?configonly=true&level=1"
+	body, _ := RestCall("GET", url, nil)
+	var ne_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &ne_data)
+	if err != nil {
+		panic(err)
+	}
+	for nes, ne_val := range ne_data {
+		if ne_val.(map[string]interface{})["ne_dname"] == NeName {
+			NeID = nes
+			return NeID
+		}
+	}
+	return ""
 }
 
 func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP string, Netmask string) {
@@ -380,6 +380,31 @@ func RemoveMetaconfig(domainID string, netID string, endpointID string) {
 				}
 				url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device + "/prop/" + endpoint
 				RestCall("DELETE", url, nil)
+			}
+		}
+	}
+}
+
+func DeleteAttachedLB(DomainID string, NetworkID string) {
+
+	url := "/0/connectivity/domain_prop/" + DomainID + "/ne"
+	body, _ := RestCall("GET", url+"?configonly=true", nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+	for a, b := range domain_data {
+		if b.(map[string]interface{})["ne_metadata"] == "lbaas" {
+			x := b.(map[string]interface{})["prop"].(map[string]interface{})["vip"].(map[string]interface{})["hint"]
+			y := strings.Split(x.(string), ",")
+			for _, z := range y {
+				if strings.HasPrefix(z, "attachment") {
+					if strings.HasSuffix(z, NetworkID) {
+						url = "/v0/vd/" + DomainID + "/lbaas/" + a
+						RestCall("DELETE", url, nil)
+					}
+				}
 			}
 		}
 	}
