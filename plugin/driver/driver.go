@@ -138,7 +138,12 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
 
 	if neName != nil {
-		AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string))
+		if err := AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string)); err != nil {
+			Log.Error(err)
+			DomainDelete(domainid.(string))
+			errorResponse(w, fmt.Sprintf("Bridge (%s) doesnot exist in doamin (%s).", neName.(string), domainid.(string)))
+			return
+		}
 		AddGatewayInfo(create.NetworkID, domainid.(string), gatewayip)
 		emptyResponse(w)
 
@@ -154,7 +159,13 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		tm, _ := hex.DecodeString(ipnet.Mask.String())
 		netmask := fmt.Sprintf("%v.%v.%v.%v", tm[0], tm[1], tm[2], tm[3])
 		Log.Infof("Adding router interface for : ", router, gatewayip, netmask)
-		CreateNetworkLink(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
+		if err := CreateNetworkLink(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask); err != nil {
+			Log.Error(err)
+			BridgeDelete(create.NetworkID, domainid.(string))
+			DomainDelete(domainid.(string))
+			errorResponse(w, fmt.Sprintf("Router (%s) doesnot exist in doamin (%s).", router.(string), domainid.(string)))
+			return
+		}
 	}
 
 	emptyResponse(w)
@@ -276,6 +287,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := ifc_ctl.PgIfUp(if_local_name, "cont_"+endID[:8], domainid, bridgeID, mac, "gateway"); err != nil {
 		Log.Error(err)
 		errorResponse(w, "Unable to on-board container onto PLUMgrid")
+		return
 	}
 
 	if netlink.LinkSetUp(local) != nil {
@@ -316,6 +328,7 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := ifc_ctl.PgIfDown(if_local_name, "gateway"); err != nil {
 		Log.Error(err)
 		errorResponse(w, "Unable to off-board container from PLUMgrid")
+		return
 	}
 
 	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
