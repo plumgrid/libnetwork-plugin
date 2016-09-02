@@ -213,7 +213,7 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
-		errorResponsef(w, "could not create veth pair")
+		errorResponse(w, "could not create veth pair")
 		return
 	}
 	link, _ := netlink.LinkByName(local.PeerName)
@@ -313,7 +313,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if netlink.LinkSetUp(local) != nil {
-		errorResponsef(w, `unable to bring veth up`)
+		errorResponse(w, "unable to bring veth up")
 		return
 	}
 
