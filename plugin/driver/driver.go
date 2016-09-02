@@ -139,7 +139,12 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
 
 	if neName != nil {
-		AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string))
+		if err := AddNetworkInfo(create.NetworkID, neName.(string), domainid.(string)); err != nil {
+			Log.Error(err)
+			DomainDelete(domainid.(string))
+			errorResponse(w, fmt.Sprintf("Bridge (%s) doesnot exist in doamin (%s).", neName.(string), domainid.(string)))
+			return
+		}
 		AddGatewayInfo(create.NetworkID, domainid.(string), gatewayip)
 		emptyResponse(w)
 
@@ -155,7 +160,13 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 		tm, _ := hex.DecodeString(ipnet.Mask.String())
 		netmask := fmt.Sprintf("%v.%v.%v.%v", tm[0], tm[1], tm[2], tm[3])
 		Log.Infof("Adding router interface for : ", router, gatewayip, netmask)
-		CreateNetworkLink(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask)
+		if err := CreateNetworkLink(router.(string), domainid.(string), create.NetworkID, gatewayip, netmask); err != nil {
+			Log.Error(err)
+			BridgeDelete(create.NetworkID, domainid.(string))
+			DomainDelete(domainid.(string))
+			errorResponse(w, fmt.Sprintf("Router (%s) doesnot exist in doamin (%s).", router.(string), domainid.(string)))
+			return
+		}
 	}
 
 	emptyResponse(w)
@@ -202,7 +213,7 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
-		errorResponsef(w, "could not create veth pair")
+		errorResponse(w, "could not create veth pair")
 		return
 	}
 	link, _ := netlink.LinkByName(local.PeerName)
@@ -273,7 +284,6 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	mac := link.Attrs().HardwareAddr.String()
 	Log.Infof("mac address: %s\n", mac)
 
-	//first command {adding port on plumgrid}
 	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway add_port " + if_local_name
 	Log.Infof("addport cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
@@ -282,9 +292,12 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output: %+v\n", addport.String())
+	if addport.String() != "" {
+		Log.Error(fmt.Errorf(addport.String()))
+		errorResponse(w, "Unable to on-board container onto PLUMgrid")
+		return
+	}
 
-	//second command {up the port on plumgrid}
 	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:8] + " " + mac + " pgtag2=" + bridgeID + " pgtag1=" + domainid
 	Log.Infof("ifup cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
@@ -293,10 +306,14 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output: %+v\n", ifup.String())
+	if ifup.String() != "" {
+		Log.Error(fmt.Errorf(ifup.String()))
+		errorResponse(w, "Unable to on-board container onto PLUMgrid")
+		return
+	}
 
 	if netlink.LinkSetUp(local) != nil {
-		errorResponsef(w, `unable to bring veth up`)
+		errorResponse(w, "unable to bring veth up")
 		return
 	}
 
@@ -329,7 +346,6 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
-	//first command {adding port on plumgrid}
 	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
 	Log.Infof("ifdown cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
@@ -338,9 +354,11 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output: %+v\n", ifdown.String())
+	if ifdown.String() != "" {
+		Log.Error(fmt.Errorf(ifdown.String()))
+		errorResponse(w, "Unable to off-board container from PLUMgrid")
+	}
 
-	//second command {up the port on plumgrid}
 	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway del_port " + if_local_name
 	Log.Infof("delport cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
@@ -350,6 +368,10 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		Log.Error("Error thrown: ", err)
 	}
 	Log.Infof("output: %+v\n", delport.String())
+	if delport.String() != "" {
+		Log.Error(fmt.Errorf(delport.String()))
+		errorResponse(w, "Unable to off-board container from PLUMgrid")
+	}
 
 	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
 
