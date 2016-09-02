@@ -36,7 +36,7 @@ func sendError(w http.ResponseWriter, msg string, code int) {
 	http.Error(w, msg, code)
 }
 
-func errorResponse(w http.ResponseWriter, fmtString string, item ...interface{}) {
+func errorResponsef(w http.ResponseWriter, fmtString string, item ...interface{}) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"Err": fmt.Sprintf(fmtString, item...),
 	})
