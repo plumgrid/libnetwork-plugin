@@ -28,6 +28,7 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/netlabel"
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/plumgrid/cli/helpers/plumgrid/ifc_ctl"
 
 	"github.com/gorilla/mux"
 	"github.com/vishvananda/netlink"
@@ -284,7 +285,20 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	mac := link.Attrs().HardwareAddr.String()
 	Log.Infof("mac address: %s\n", mac)
 
-	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway add_port " + if_local_name
+	//second command {up the port on plumgrid}
+	se_name, err := ifc_ctl.PgGetContainerDoorName()
+	if err != nil {
+		Log.Infof("Error attempting to find SE_name, will attempt ifc_ctl with default: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	if se_name == "" {
+		Log.Infof("Could not find SE name, will try to use default door name: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	//first command {adding port on plumgrid}
+	cmdStr := "sudo /opt/pg/bin/ifc_ctl " + se_name + " add_port " + if_local_name
 	Log.Infof("addport cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 	var addport bytes.Buffer
@@ -298,7 +312,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway ifup " + if_local_name + " access_container cont_" + endID[:8] + " " + mac + " pgtag2=" + bridgeID + " pgtag1=" + domainid
+	//second command {up the port on plumgrid}
+	cmdStr = "sudo /opt/pg/bin/ifc_ctl " + se_name + " ifup " + if_local_name + " access_container cont_" + endID[:8] + " " + mac + " pgtag2=" + bridgeID + " pgtag1=" + domainid
 	Log.Infof("ifup cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
 	var ifup bytes.Buffer
@@ -346,7 +361,20 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
-	cmdStr := "sudo /opt/pg/bin/ifc_ctl gateway ifdown " + if_local_name
+	//second command {up the port on plumgrid}
+	se_name, err := ifc_ctl.PgGetContainerDoorName()
+	if err != nil {
+		Log.Infof("Error attempting to find SE_name, will attempt ifc_ctl with default: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	if se_name == "" {
+		Log.Infof("Could not find SE name, will try to use default door name: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	//first command {adding port on plumgrid}
+	cmdStr := "sudo /opt/pg/bin/ifc_ctl " + se_name + " ifdown " + if_local_name
 	Log.Infof("ifdown cmd: %s", cmdStr)
 	cmd := exec.Command("/bin/sh", "-c", cmdStr)
 	var ifdown bytes.Buffer
@@ -359,7 +387,8 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, "Unable to off-board container from PLUMgrid")
 	}
 
-	cmdStr = "sudo /opt/pg/bin/ifc_ctl gateway del_port " + if_local_name
+	//second command {up the port on plumgrid}
+	cmdStr = "sudo /opt/pg/bin/ifc_ctl " + se_name + " del_port " + if_local_name
 	Log.Infof("delport cmd: %s", cmdStr)
 	cmd = exec.Command("/bin/sh", "-c", cmdStr)
 	var delport bytes.Buffer
