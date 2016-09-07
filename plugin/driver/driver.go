@@ -272,8 +272,18 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	mac := link.Attrs().HardwareAddr.String()
 	Log.Infof("mac address: %s\n", mac)
 
-	// ifc_ctl interface up {Interface Name, Container ID, Domain ID, Bridge ID, MAC address, SE name}
-	if err := ifc_ctl.PgIfUp(if_local_name, "cont_"+endID[:8], domainid, bridgeID, mac, "gateway"); err != nil {
+	se_name, err := ifc_ctl.PgGetContainerDoorName()
+	if err != nil {
+		Log.Infof("Error attempting to find SE_name, will attempt ifc_ctl with default: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	if se_name == "" {
+		Log.Infof("Could not find SE name, will try to use default door name: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	if err := ifc_ctl.PgIfUp(if_local_name, "cont_"+endID[:8], domainid, bridgeID, mac, se_name); err != nil {
 		Log.Error(err)
 		errorResponse(w, "Unable to on-board container onto PLUMgrid")
 	}
@@ -312,8 +322,19 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + l.EndpointID[:5]
 
+	se_name, err := ifc_ctl.PgGetContainerDoorName()
+	if err != nil {
+		Log.Infof("Error attempting to find SE_name, will attempt ifc_ctl with default: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
+	if se_name == "" {
+		Log.Infof("Could not find SE name, will try to use default door name: %s", ifc_ctl.DEFAULT_SE_NAME)
+		se_name = ifc_ctl.DEFAULT_SE_NAME
+	}
+
 	// ifc_ctl interface down {Interface name, SE name}
-	if err := ifc_ctl.PgIfDown(if_local_name, "gateway"); err != nil {
+	if err := ifc_ctl.PgIfDown(if_local_name, se_name); err != nil {
 		Log.Error(err)
 		errorResponse(w, "Unable to off-board container from PLUMgrid")
 	}
