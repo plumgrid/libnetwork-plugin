@@ -28,6 +28,7 @@ import (
 	"github.com/docker/libnetwork/drivers/remote/api"
 	"github.com/docker/libnetwork/netlabel"
 	docker "github.com/fsouza/go-dockerclient"
+
 	"github.com/plumgrid/cli/helpers/plumgrid/ifc_ctl"
 
 	"github.com/gorilla/mux"
@@ -343,6 +344,18 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+
+	if auto_arp {
+		// Run this assyncronously? Leaving the code prepared
+		go func(net_ns_path string, pg_ifc_prefix string) {
+
+			err := RunContainerArping(net_ns_path, pg_ifc_prefix)
+			if err != nil {
+				Log.Printf("Error while running arping : %v", err)
+			}
+
+		}(j.SandboxKey, ifname.DstPrefix)
+	}
 }
 
 // leave call
