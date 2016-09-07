@@ -15,16 +15,18 @@
 package driver
 
 import (
-	"github.com/alyu/configparser"
 	"log"
+
+	"github.com/alyu/configparser"
 )
 
 var (
-	vip            string
-	username       string
-	password       string
-	default_vd     string
-	scope          string
+	vip        string
+	username   string
+	password   string
+	default_vd string
+	scope      string
+	auto_arp   bool = false
 )
 
 // Read configuration file
@@ -43,6 +45,7 @@ func ReadConfig() {
 		username = pg_section.ValueOf("pg_username")
 		password = pg_section.ValueOf("pg_password")
 		default_vd = pg_section.ValueOf("default_domain")
+
 	}
 
 	// get Libnetwork config
@@ -51,5 +54,6 @@ func ReadConfig() {
 		log.Fatal(lib_err)
 	} else {
 		scope = lib_section.ValueOf("scope")
+		auto_arp = lib_section.Exists("auto_arp")
 	}
 }
