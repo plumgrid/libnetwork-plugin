@@ -16,6 +16,7 @@ package driver
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -77,7 +78,8 @@ func BridgeDelete(ID string, domainid string) {
 	RestCall("DELETE", url, nil)
 }
 
-func AddNetworkInfo(dNetwork string, neName string, domain string) {
+func AddNetworkInfo(dNetwork string, neName string, domain string) error {
+
 	id := GetNeId(neName, domain)
 	var neId string
 	if id == "" {
@@ -85,6 +87,10 @@ func AddNetworkInfo(dNetwork string, neName string, domain string) {
 	} else {
 		neId = id
 	}
+	if !CheckNeExists(neId, domain) {
+		return fmt.Errorf("Bridge (%s) doesnot exist in doamin (%s).", neName, domain)
+	}
+
 	url := "/0/connectivity/domain/" + domain + "/ne/" + neId
 	body, _ := RestCall("GET", url+"?configonly=true", nil)
 	var netData map[string]interface{}
@@ -95,6 +101,8 @@ func AddNetworkInfo(dNetwork string, neName string, domain string) {
 	netData["metadata"] = dNetwork
 	finalData, _ := json.Marshal(netData)
 	RestCall("PUT", url, finalData)
+
+	return nil
 }
 
 func FindDomainFromNetwork(ID string) (domainid string, netid string) {
@@ -238,9 +246,13 @@ func GetNeId(NeName string, DomainID string) (NeID string) {
 	return ""
 }
 
-func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP string, Netmask string) {
+func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP string, Netmask string) error {
 
 	ne_ID := GetNeId(NeName, DomainID)
+	if !CheckNeExists(ne_ID, DomainID) {
+		return fmt.Errorf("Router (%s) doesnot exist in doamin (%s).", NeName, DomainID)
+	}
+
 	CheckNeChildList(ne_ID, DomainID, "ifc")
 	CheckNeChildList(NetworkName(NetworkID), DomainID, "ifc")
 	ne_ifc := NetworkID
@@ -271,6 +283,8 @@ func CreateNetworkLink(NeName string, DomainID string, NetworkID string, IP stri
                          "attachment1": "/ne/` + ne_ID + `/ifc/` + ne_ifc + `",
                          "attachment2": "/ne/` + NetworkName(NetworkID) + `/ifc/` + net_ifc + `"}`)
 	RestCall("PUT", url, data)
+
+	return nil
 }
 
 func DeleteNetworkLinks(DomainID string, NetworkID string) {
@@ -408,4 +422,24 @@ func DeleteAttachedLB(DomainID string, NetworkID string) {
 			}
 		}
 	}
+}
+
+func CheckNeExists(ne_name, domain string) bool {
+
+	url := "/0/connectivity/domain/" + domain + "/ne?configonly=true"
+
+	body, _ := RestCall("GET", url+"?configonly=true", nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for ne, _ := range domain_data {
+		if ne_name == ne {
+			return true
+		}
+	}
+
+	return false
 }
