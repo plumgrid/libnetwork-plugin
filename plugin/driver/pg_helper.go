@@ -428,7 +428,7 @@ func CheckNeExists(ne_name, domain string) bool {
 
 	url := "/0/connectivity/domain/" + domain + "/ne?configonly=true"
 
-	body, _ := RestCall("GET", url+"?configonly=true", nil)
+	body, _ := RestCall("GET", url, nil)
 	var domain_data map[string]interface{}
 	err := json.Unmarshal([]byte(body), &domain_data)
 	if err != nil {
@@ -437,6 +437,26 @@ func CheckNeExists(ne_name, domain string) bool {
 
 	for ne, _ := range domain_data {
 		if ne_name == ne {
+			return true
+		}
+	}
+
+	return false
+}
+
+func CheckExternalConnectivity(domain string) bool {
+
+	url := "/0/connectivity/domain_prop/" + domain + "/ne?configonly=true"
+
+	body, _ := RestCall("GET", url, nil)
+	var domain_data map[string]interface{}
+	err := json.Unmarshal([]byte(body), &domain_data)
+	if err != nil {
+		panic(err)
+	}
+
+	for key, _ := range domain_data {
+		if key == "external_connectivity_enable" {
 			return true
 		}
 	}

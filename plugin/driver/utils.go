@@ -25,7 +25,6 @@ import (
 )
 
 // Response Functions
-
 func notFound(w http.ResponseWriter, r *http.Request) {
 	Log.Warningf("[plugin] Not found: %+v", r)
 	http.NotFound(w, r)
@@ -54,7 +53,6 @@ func emptyResponse(w http.ResponseWriter) {
 }
 
 // Helper Functions
-
 func vethPair(suffix string) *netlink.Veth {
 	return &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{Name: "tap" + suffix},

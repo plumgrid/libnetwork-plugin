@@ -137,6 +137,11 @@ func (driver *driver) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	DomainCreate(domainid.(string))
 
+	if CheckExternalConnectivity(domainid.(string)) {
+		errorResponse(w, fmt.Sprintf("Non-external network cannot be created in transit domain."))
+		return
+	}
+
 	gatewayip := create.IPv4Data[0].Gateway.IP.String()
 	neName := create.Options[netlabel.GenericData].(map[string]interface{})["bridge"]
 
