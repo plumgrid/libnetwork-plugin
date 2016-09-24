@@ -345,7 +345,9 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
-	AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac)
+	if push_metaconfig {
+		AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac)
+	}
 
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
@@ -419,7 +421,9 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, "Unable to off-board container from PLUMgrid")
 	}
 
-	RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
+	if push_metaconfig {
+		RemoveMetaconfig(domainid, bridgeID, l.EndpointID)
+	}
 
 	emptyResponse(w)
 	Log.Infof("Leave %s:%s", l.NetworkID, l.EndpointID)

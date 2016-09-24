@@ -21,12 +21,13 @@ import (
 )
 
 var (
-	vip        string
-	username   string
-	password   string
-	default_vd string
-	scope      string
-	auto_arp   bool = false
+	vip             string
+	username        string
+	password        string
+	default_vd      string
+	scope           string
+	auto_arp        bool = false
+	push_metaconfig bool = false
 )
 
 // Read configuration file
@@ -55,5 +56,6 @@ func ReadConfig() {
 	} else {
 		scope = lib_section.ValueOf("scope")
 		auto_arp = lib_section.Exists("auto_arp")
+		push_metaconfig = lib_section.Exists("push_metaconfig")
 	}
 }
