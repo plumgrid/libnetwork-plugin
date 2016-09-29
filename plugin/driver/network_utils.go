@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -32,27 +31,12 @@ import (
 // that match with the prefix given to libnetwork
 func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 
-	Log.Printf("Attempting to acces the container %s NetNS", net_ns_path)
 	var netns ns.NetNS
 	var err error
-	success := false
 
-	for attempts := 0; attempts <= 5; attempts++ {
-
-		netns, err = ns.GetNS(net_ns_path)
-
-		if err != nil {
-			Log.Printf("Attempt %d: failed to open netns %s: %v", attempts, net_ns_path, err)
-			time.Sleep(1 * time.Second)
-		} else {
-			success = true
-			break
-		}
-		attempts += 1
-	}
-
-	if !success {
-		return fmt.Errorf("Attempts exhaused, could not access %s, exiting", net_ns_path)
+	netns, err = ns.GetNS(net_ns_path)
+	if err != nil {
+		return fmt.Errorf("Failed to open netns %s: %v", net_ns_path, err)
 	}
 	defer netns.Close()
 
@@ -70,8 +54,6 @@ func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 			if strings.HasPrefix(ifc.Name, pg_ifc_prefix) {
 				// Valid PG-created ifc
 
-				// TODO we might want to add a retry here to make sure,
-				// in case the IFC is up but still has no IP, we retry
 				address_slice, err := ifc.Addrs()
 				if err != nil {
 					Log.Errorf("Failed to get Address slice for ifc %s: %v", ifc.Name, err)
@@ -83,7 +65,6 @@ func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 					continue
 				}
 
-				Log.Printf("Attempting raw socket open on %s", ifc.Name)
 				handle, err := pcap.OpenLive(ifc.Name, 65536, true, pcap.BlockForever)
 				if err != nil {
 					return fmt.Errorf("Failed to open raw socket %s : %v", ifc.Name, err)
@@ -105,18 +86,14 @@ func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 					// Get ARP packet
 					arp_pkt := getGratuitousArp(ifc.HardwareAddr, ip)
 
-					for i := 0; i <= 3; i++ {
-						Log.Printf("Sending %d GARP on %s : %s - %s",
-							i, ifc.Name, ifc.HardwareAddr.String(), ip.String())
+					Log.Printf("Sending %s GARP on %s : %s",
+						ifc.Name, ifc.HardwareAddr.String(), ip.String())
 
-						if err := handle.WritePacketData(arp_pkt); err != nil {
-							handle.Close()
-							return fmt.Errorf("Failed to write ARP packet data on %s : %v", ifc.Name, err)
-						}
-						time.Sleep(750 * time.Millisecond)
+					if err := handle.WritePacketData(arp_pkt); err != nil {
+						Log.Printf("Failed to write ARP packet data on %s : %v", ifc.Name, err)
+						continue
 					}
 				}
-
 				// Close the socket
 				handle.Close()
 			}
