@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	Log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/drivers/remote/api"
@@ -346,7 +347,8 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if push_metaconfig {
-		AddMetaconfig(domainid, bridgeID, j.SandboxKey[22:], endID, mac)
+		SandBoxID := strings.Split(j.SandboxKey, "/")
+		AddMetaconfig(domainid, bridgeID, SandBoxID[len(SandBoxID)-1], endID, mac)
 	}
 
 	objectResponse(w, res)
@@ -415,7 +417,6 @@ func (driver *driver) leaveEndpoint(w http.ResponseWriter, r *http.Request) {
 	if err := cmd.Run(); err != nil {
 		Log.Error("Error thrown: ", err)
 	}
-	Log.Infof("output: %+v\n", delport.String())
 	if delport.String() != "" {
 		Log.Error(fmt.Errorf(delport.String()))
 		errorResponse(w, "Unable to off-board container from PLUMgrid")
