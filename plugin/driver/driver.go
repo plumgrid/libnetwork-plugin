@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	Log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/drivers/remote/api"
@@ -352,7 +353,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objectResponse(w, res)
-	Log.Infof("Join endpoint %s:%s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+	Log.Infof("Join endpoint %s: %s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 
 	if auto_arp {
 		go func(net_ns_path string, pg_ifc_prefix string) {
@@ -360,12 +361,14 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 			// Disallow this goroutine to work on any other thread than this one
 			// since namespace ops (unshare, setns) are done for a single thread, we
 			// must ensure that the goroutine does not jump from OS thread to thread
-			runtime.LockOSThread()
-			defer runtime.UnlockOSThread()
-
-			err := RunContainerArping(net_ns_path, pg_ifc_prefix)
-			if err != nil {
-				Log.Printf("Error while running arping : %v", err)
+			for i := 0; i <= 4; i++ {
+				runtime.LockOSThread()
+				err := RunContainerArping(net_ns_path, pg_ifc_prefix)
+				if err != nil {
+					Log.Printf("Arping failed : %v", err)
+				}
+				runtime.UnlockOSThread()
+				time.Sleep(1 * time.Second)
 			}
 
 		}(j.SandboxKey, ifname.DstPrefix)
