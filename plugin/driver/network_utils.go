@@ -134,3 +134,123 @@ func getGratuitousArp(mac net.HardwareAddr, ip net.IP) []byte {
 
 	return buf.Bytes()
 }
+
+type NetworkIfc struct {
+	ifc_name string
+	mac_addr string
+	ip       string
+	mask     string
+}
+
+func GetInterfaceInformation(net_ns_path string) ([]NetworkIfc, error) {
+
+	var netns ns.NetNS
+	var err error
+
+	netns, err = ns.GetNS(net_ns_path)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open netns %s: %v", net_ns_path, err)
+	}
+	defer netns.Close()
+
+	var net_info []NetworkIfc
+
+	// Let's go in
+	err = netns.Do(func(_ ns.NetNS) error {
+		// Get Ifcs on container
+		ifc_list, err := net.Interfaces()
+
+		if err != nil {
+			return fmt.Errorf("Failed to get interfaces in Netns: %v", err)
+		}
+
+		// For some reason I can't properly copy the full interface info struct outside. Seems the go net library is doing some
+		// caching inbetween (checked on source code)
+
+		// This is pathetic, but until I have a way to copy the full struct and substructs, I have to do this.
+		// Quite the chance the return is not static data, but instead is computed every time yout call, hence data changes between
+		// invocations in and out of the netNS
+		for _, ifc := range ifc_list {
+			if ifc.HardwareAddr == nil {
+				continue
+			}
+			store := false
+
+			var ip_store string
+			var mask_store string
+			var ifc_name_store string = ifc.Name
+			var mac_store string = ifc.HardwareAddr.String()
+
+			address_slice, err := ifc.Addrs()
+			if err != nil {
+				continue
+			}
+
+			for _, addr := range address_slice {
+				ip_a, net_a, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					continue
+				}
+
+				if ip_a.To4() == nil {
+					// ignoring IPV6 addr
+					continue
+				}
+
+				// break and store
+				ip_store = ip_a.String()
+				mask_store = net_a.Mask.String()
+				store = true
+				break
+			}
+
+			if store {
+				net_info = append(net_info, NetworkIfc{
+					ip:       ip_store,
+					mask:     mask_store,
+					mac_addr: mac_store,
+					ifc_name: ifc_name_store,
+				})
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return net_info, nil
+}
+
+func CheckAndWriteMetaconfig(network_info []NetworkIfc,
+	SandBoxID string,
+	pg_prefix string,
+	domain string,
+	bridge string,
+	endpointId string) error {
+
+	// Signal job's done
+	wrote_metadata := false
+
+	// Writting metadata for each PG-created interface
+	for _, ifc := range network_info {
+
+		// Validate it is a PG create ifc first
+		if strings.HasPrefix(ifc.ifc_name, pg_prefix) {
+			Log.Printf("Writting Metadata for dom:%s bridge:%s  sandbox:%s endpoint:%s mac:%s ip:%s", domain, bridge, SandBoxID, endpointId, ifc.mac_addr, ifc.ip)
+			AddMetaconfig(domain, bridge, SandBoxID, endpointId, ifc.mac_addr, ifc.ip)
+
+			wrote_metadata = true
+
+			break // breaking for now, we need to clarify what do we do with 1+ interfaces
+		}
+	}
+
+	if !wrote_metadata {
+		return fmt.Errorf("Did not find appropriated IFC data to write")
+	}
+
+	return nil
+}

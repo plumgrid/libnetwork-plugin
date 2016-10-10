@@ -347,13 +347,49 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
-	if push_metaconfig {
-		SandBoxID := strings.Split(j.SandboxKey, "/")
-		AddMetaconfig(domainid, bridgeID, SandBoxID[len(SandBoxID)-1], endID, mac)
-	}
-
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s: %s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
+
+	if push_metaconfig {
+		// This ig global
+		SandBox_split := strings.Split(j.SandboxKey, "/")
+
+		if len(SandBox_split) == 0 {
+			Log.Panicf("Netns split failed: %s, cannot push metadata", j.SandboxKey)
+		} else {
+
+			// Get the last element
+			SandBoxID := SandBox_split[len(SandBox_split)-1]
+
+			// This guy will wait assynchronously the NS to be available, will read the MAC/IP from the NS and will commit it
+			// to tenant manager when available; all on best effort/ limmited retry operations
+			go func(net_ns_path string, pg_ifc_prefix string) {
+				// Attempt tenant manager information write
+				for i := 0; i <= 5; i++ {
+					runtime.LockOSThread()
+					// Get all network information from the insides of the network namespace
+					ifc_data, err := GetInterfaceInformation(net_ns_path)
+
+					// not sure if I should extend the lock while writting tenant_manager; no guarantee will have any serialization effect
+					runtime.UnlockOSThread()
+
+					if err != nil {
+						Log.Printf("Could not get Interface Information for netns %s: %s (retry %d/%d)", net_ns_path, err, i, 5)
+					} else {
+						err = CheckAndWriteMetaconfig(ifc_data, SandBoxID, pg_ifc_prefix, domainid, bridgeID, endID)
+						if err == nil {
+							// Let's get out of the loop altogether, metadata has been written successfully
+							break
+						} else {
+							Log.Printf("Write Metaconfig bailed for %s: %s. (retry %d/%d) ", net_ns_path, err, i, 5)
+						}
+					}
+
+					time.Sleep(900 * time.Millisecond)
+				}
+			}(j.SandboxKey, ifname.DstPrefix)
+		}
+	}
 
 	if auto_arp {
 		go func(net_ns_path string, pg_ifc_prefix string) {
@@ -365,7 +401,7 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 				runtime.LockOSThread()
 				err := RunContainerArping(net_ns_path, pg_ifc_prefix)
 				if err != nil {
-					Log.Printf("Arping failed : %v", err)
+					Log.Printf("Arping failed : %v. (Retry %d/%d)", err, i, 4)
 				}
 				runtime.UnlockOSThread()
 				time.Sleep(1 * time.Second)
