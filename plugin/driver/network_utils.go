@@ -17,7 +17,6 @@ package driver
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -29,16 +28,18 @@ import (
 
 // Plumgrid just specifies the prefix, so we will arping on all ifcs
 // that match with the prefix given to libnetwork
-func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
+func GetIPandGarp(net_ns_path string, mac string, auto_arp bool) (string, error) {
 
 	var netns ns.NetNS
 	var err error
 
 	netns, err = ns.GetNS(net_ns_path)
 	if err != nil {
-		return fmt.Errorf("Failed to open netns %s: %v", net_ns_path, err)
+		return "", fmt.Errorf("Failed to open netns %s: %v", net_ns_path, err)
 	}
 	defer netns.Close()
+
+	var ifc_ip string
 
 	// Let's go in
 	err = netns.Do(func(_ ns.NetNS) error {
@@ -51,37 +52,55 @@ func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 
 		// Iterate Ifcs
 		for _, ifc := range ifc_list {
-			if strings.HasPrefix(ifc.Name, pg_ifc_prefix) {
-				// Valid PG-created ifc
+			// Valid PG-created ifc
 
-				address_slice, err := ifc.Addrs()
+			hw_addr := ifc.HardwareAddr
+			if hw_addr == nil {
+				// Supressing this output, as for loopback is quite spammy
+				// Log.Errorf("Failed to get HW Addr for %s: %v", ifc.Name, err)
+				continue
+			}
+
+			hw_addr_s := hw_addr.String()
+
+			if hw_addr_s != mac {
+				// not the ifc we are lookin for
+				continue
+			}
+
+			address_slice, err := ifc.Addrs()
+			if err != nil {
+				Log.Errorf("Failed to get Address slice for ifc %s: %s", ifc.Name, err)
+				continue
+			}
+
+			if len(address_slice) == 0 {
+				Log.Printf("Interface %s had no IP address at the moment we checked", ifc.Name)
+				continue
+			}
+
+			for _, ifc_addr := range address_slice {
+				ip, _, err := net.ParseCIDR(ifc_addr.String())
 				if err != nil {
-					Log.Errorf("Failed to get Address slice for ifc %s: %v", ifc.Name, err)
+					Log.Printf("Failed to parse network %s for ifc %s : %s", ifc_addr.String(), ifc.Name, err)
 					continue
 				}
 
-				if len(address_slice) == 0 {
-					Log.Errorf("Interface %s had no IP address at the moment we checked", ifc.Name)
+				if ip.To4() == nil {
+					// ignoring any IPV6 addr
 					continue
 				}
 
-				handle, err := pcap.OpenLive(ifc.Name, 65536, true, pcap.BlockForever)
-				if err != nil {
-					return fmt.Errorf("Failed to open raw socket %s : %v", ifc.Name, err)
-				}
+				// Ip for this IFC found, this will be returned already
+				ifc_ip = ip.To4().String()
 
-				// We will just arping for all IPv4 addresses on this ifc, just in case
-				for _, ifc_addr := range address_slice {
-					ip, _, err := net.ParseCIDR(ifc_addr.String())
+				// See if we have to garp or just return the IP
+				if auto_arp {
+					handle, err := pcap.OpenLive(ifc.Name, 65536, true, pcap.BlockForever)
 					if err != nil {
-						Log.Printf("Failed to parse network %s : %v", ifc_addr.String(), err)
-						continue
+						return fmt.Errorf("Failed to open raw socket %s : %s", ifc.Name, err)
 					}
-
-					if ip.To4() == nil {
-						// ignoring IPV6 addr
-						continue
-					}
+					defer handle.Close()
 
 					// Get ARP packet
 					arp_pkt := getGratuitousArp(ifc.HardwareAddr, ip)
@@ -90,18 +109,15 @@ func RunContainerArping(net_ns_path string, pg_ifc_prefix string) error {
 						ifc.Name, ifc.HardwareAddr.String(), ip.String())
 
 					if err := handle.WritePacketData(arp_pkt); err != nil {
-						Log.Printf("Failed to write ARP packet data on %s : %v", ifc.Name, err)
-						continue
+						return fmt.Errorf("Failed to Write GARP in raw socket %s : %s", ifc.Name, err)
 					}
 				}
-				// Close the socket
-				handle.Close()
 			}
 		}
 		return nil
 	})
 
-	return err
+	return ifc_ip, err
 }
 
 func getGratuitousArp(mac net.HardwareAddr, ip net.IP) []byte {

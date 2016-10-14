@@ -347,31 +347,64 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 		Gateway:       gatewayIP,
 	}
 
-	if push_metaconfig {
-		SandBoxID := strings.Split(j.SandboxKey, "/")
-		AddMetaconfig(domainid, bridgeID, SandBoxID[len(SandBoxID)-1], endID, mac)
-	}
-
 	objectResponse(w, res)
 	Log.Infof("Join endpoint %s: %s to %s", j.NetworkID, j.EndpointID, j.SandboxKey)
 
-	if auto_arp {
-		go func(net_ns_path string, pg_ifc_prefix string) {
+	if auto_arp || push_metaconfig {
+		go func(net_ns_path string, mac string) {
 
-			// Disallow this goroutine to work on any other thread than this one
-			// since namespace ops (unshare, setns) are done for a single thread, we
-			// must ensure that the goroutine does not jump from OS thread to thread
-			for i := 0; i <= 4; i++ {
-				runtime.LockOSThread()
-				err := RunContainerArping(net_ns_path, pg_ifc_prefix)
-				if err != nil {
-					Log.Printf("Arping failed : %v", err)
+			sandboxID := ""
+			if push_metaconfig {
+				SandBox_split := strings.Split(net_ns_path, "/")
+				if len(SandBox_split) == 0 {
+					Log.Errorf("Netns split failed: %s, cannot push metadata", j.SandboxKey)
+				} else {
+					sandboxID = SandBox_split[len(SandBox_split)-1]
 				}
-				runtime.UnlockOSThread()
-				time.Sleep(1 * time.Second)
 			}
 
-		}(j.SandboxKey, ifname.DstPrefix)
+			tenant_manager_written := false
+			ifc_ip := ""
+
+			for i := 0; i <= 4; i++ {
+				// Enter the namespace and getIp/Garp if:
+				// We don't have the IP and we have to push metaconfig or
+				// We have to garp
+				if ifc_ip == "" || auto_arp {
+					// Attempt to get IP for mac and/or garp.
+					// Functions were merged to avoid overhead in operations inside the NS
+					runtime.LockOSThread()
+					ifc_ip, err = GetIPandGarp(net_ns_path, mac, auto_arp)
+					runtime.UnlockOSThread()
+
+					if err != nil {
+						Log.Printf("Garp or IP Get failed : ip:%s  err:%s. (Retry %d/%d)", ifc_ip, err, i, 4)
+					}
+				}
+
+				// Push metadata if
+				// - We have to do it
+				// - the IFC ip is known
+				// - sandboxID is known
+				// - and we haven't done it already
+				if push_metaconfig && (ifc_ip != "") && (sandboxID != "") && !tenant_manager_written {
+
+					Log.Printf("Writting metaconfig: dom: %s net:%s sandID:%s endID:%s mac:%s ip:%s",
+						domainid, netID, sandboxID, endID, mac, ifc_ip)
+
+					AddMetaconfig(domainid, netID, sandboxID, endID, mac, ifc_ip)
+
+					// Signal tenant manager has already been written
+					tenant_manager_written = true
+
+					// shortcut, if we are not garping we are done
+					if !auto_arp {
+						return
+					}
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}(j.SandboxKey, mac)
 	}
 }
 
