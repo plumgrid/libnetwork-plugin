@@ -222,10 +222,17 @@ func (driver *driver) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	local := vethPair(endID[:5])
 	if err := netlink.LinkAdd(local); err != nil {
 		Log.Error(err)
-		errorResponse(w, "could not create veth pair")
+		errorResponse(w, "Could not create veth pair %v : %s", local, err)
 		return
 	}
-	link, _ := netlink.LinkByName(local.PeerName)
+
+	link, err := netlink.LinkByName(local.PeerName)
+	if err != nil {
+		Log.Errorf("Failed to get link %s in LinkByName : err %s", local.PeerName, err)
+		errorResponse(w, "Could not lookup link by name %s : err: %s", local.PeerName, err)
+		return
+	}
+
 	mac := link.Attrs().HardwareAddr.String()
 
 	resp := &api.CreateEndpointResponse{
@@ -289,7 +296,13 @@ func (driver *driver) joinEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	if_local_name := "tap" + endID[:5]
 
-	link, _ := netlink.LinkByName(local.PeerName)
+	link, err := netlink.LinkByName(local.PeerName)
+	if err != nil {
+		Log.Errorf("Failed to get link %s in LinkByName : err %s", local.PeerName, err)
+		errorResponse(w, "Could not lookup link by name %s : err: %s", local.PeerName, err)
+		return
+	}
+
 	mac := link.Attrs().HardwareAddr.String()
 	Log.Infof("mac address: %s\n", mac)
 
