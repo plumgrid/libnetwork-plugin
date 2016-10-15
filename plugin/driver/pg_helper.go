@@ -359,6 +359,7 @@ func AddMetaconfig(domainID string, netID string, deviceID string, endpointID st
 		if device == deviceID {
 			url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID + "/prop/" + endpointID
 			data := []byte(`{"phy_address": "` + macaddr + `",
+			                 "ip_address": "` + ip + `",
 					 "hint": "` + netID + `"}`)
 			RestCall("PUT", url, data)
 			return
