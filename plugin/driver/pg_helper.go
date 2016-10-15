@@ -355,15 +355,13 @@ func AddMetaconfig(domainID string, netID string, deviceID string, endpointID st
 		panic(err)
 	}
 
-	for device, _ := range tm_data["workloads"].(map[string]interface{}) {
-		if device == deviceID {
-			url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID + "/prop/" + endpointID
-			data := []byte(`{"phy_address": "` + macaddr + `",
-			                 "ip_address": "` + ip + `",
-					 "hint": "` + netID + `"}`)
-			RestCall("PUT", url, data)
-			return
-		}
+	if _, ok := tm_data["workloads"].(map[string]interface{})[deviceID]; ok {
+		url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID + "/prop/" + endpointID
+		data := []byte(`{"phy_address": "` + macaddr + `",
+			         "ip_address": "` + ip + `",
+				 "hint": "` + netID + `"}`)
+		RestCall("PUT", url, data)
+		return
 	}
 
 	url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + deviceID
@@ -387,16 +385,14 @@ func RemoveMetaconfig(domainID string, netID string, endpointID string) {
 	}
 
 	for device, prop := range tm_data["workloads"].(map[string]interface{}) {
-		for endpoint, _ := range prop.(map[string]interface{})["prop"].(map[string]interface{}) {
-			if endpoint == endpointID {
-				if len(prop.(map[string]interface{})["prop"].(map[string]interface{})) < 2 {
-					url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device
-					RestCall("DELETE", url, nil)
-					return
-				}
-				url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device + "/prop/" + endpoint
+		if _, ok := prop.(map[string]interface{})["prop"].(map[string]interface{})[endpointID]; ok {
+			if len(prop.(map[string]interface{})["prop"].(map[string]interface{})) < 2 {
+				url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device
 				RestCall("DELETE", url, nil)
+				return
 			}
+			url = "/0/tenant_manager/metaconfig/" + domainID + "/workloads/" + device + "/prop/" + endpointID
+			RestCall("DELETE", url, nil)
 		}
 	}
 }
