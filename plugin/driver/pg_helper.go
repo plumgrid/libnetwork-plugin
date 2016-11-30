@@ -345,7 +345,7 @@ func CheckNeChildList(NeID string, DomainID string, childList string) {
 	}
 }
 
-func AddMetaconfig(domainID string, netID string, deviceID string, endpointID string, macaddr string) {
+func AddMetaconfig(domainID string, netID string, deviceID string, endpointID string, macaddr string, ip string) {
 
 	url := "/0/tenant_manager/metaconfig/" + domainID + "?configonly=true"
 	body, _ := RestCall("GET", url, nil)
@@ -370,6 +370,7 @@ func AddMetaconfig(domainID string, netID string, deviceID string, endpointID st
 			 "prop": {
 				"` + endpointID + `": {
 						"phy_address": "` + macaddr + `",
+						"ip_address": "` + ip + `",
 						"hint": "` + netID + `"}}}`)
 	RestCall("PUT", url, data)
 }
